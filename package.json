@@ -1,0 +1,21 @@
+{
+  "name": "sharper2",
+  "type": "module",
+  "version": "0.0.1",
+  "engines": {
+    "node": ">=22.23.4"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@sanity/astro": "^3.6.0",
+    "@sanity/client": "^8.14.1",
+    "astro": "^7.4.7",
+    "sanity": "^6.22.0",
+    "styled-components": "^6.6.0"
+  }
+}
