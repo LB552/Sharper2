@@ -1,6 +1,9 @@
 ---
 import { sanityClient } from 'sanity:client';
 
+import MemoryGame from '../games/Memory.astro';
+import LightsGame from '../games/Lights.astro';
+
 export async function getStaticPaths() {
   const games = await sanityClient.fetch(`
     *[_type == "game" && defined(slug.current)] {
@@ -17,7 +20,17 @@ export async function getStaticPaths() {
 }
 
 const { game } = Astro.props;
+
+// EXPLANATION: MemoryGame (for example) is (a reference to) the entire MemoryGame.astro file, treated as an Astro component.
+const GameComponent = {
+  memory: MemoryGame,
+  lights: LightsGame,
+}[game.slug];
 ---
 
 <h1>{game.title}</h1>
 <p>{game.description}</p>
+
+<section class="game-window">
+    {GameComponent && <GameComponent />}
+</section>
