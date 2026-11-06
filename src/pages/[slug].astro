@@ -1,0 +1,23 @@
+---
+import { sanityClient } from 'sanity:client';
+
+export async function getStaticPaths() {
+  const games = await sanityClient.fetch(`
+    *[_type == "game" && defined(slug.current)] {
+      "slug": slug.current,
+      title,
+      description
+    }
+  `);
+
+  return games.map((game) => ({
+    params: { slug: game.slug },
+    props: { game },
+  }));
+}
+
+const { game } = Astro.props;
+---
+
+<h1>{game.title}</h1>
+<p>{game.description}</p>
