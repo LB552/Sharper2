@@ -1,0 +1,212 @@
+<h1>Login / Register</h1>
+
+<!-- LOGIN -->
+<section>
+    <h2>Login</h2>
+
+    <form id="login-form">
+        <input
+            type="email"
+            id="login-email"
+            placeholder="Email"
+            autocomplete="email"
+            required
+        >
+
+        <input
+            type="password"
+            id="login-password"
+            placeholder="Password"
+            autocomplete="current-password"
+            required
+        >
+
+        <button type="submit">Log in</button>
+
+        <p id="login-message" role="status" aria-live="polite"></p>
+    </form>
+</section>
+
+
+<!-- REGISTRATION -->
+<section>
+    <h2>Register</h2>
+
+    <form id="register-form">
+
+        <input
+            type="email"
+            id="register-email"
+            placeholder="Email"
+            autocomplete="email"
+            required
+        >
+
+        <input
+            type="password"
+            id="register-password"
+            placeholder="Password"
+            autocomplete="new-password"
+            minlength="6"
+            required
+        >
+
+        <input
+            type="password"
+            id="confirm-password"
+            placeholder="Repeat password"
+            autocomplete="new-password"
+            minlength="6"
+            required
+        >
+
+        <input
+            type="text"
+            id="register-username"
+            placeholder="Username"
+            autocomplete="username"
+            minlength="3"
+            maxlength="20"
+            pattern="[A-Za-z0-9_]+"
+            title="Use 3–20 letters, numbers, or underscores."
+            required
+        >
+
+        <button type="submit">Create Account</button>
+
+        <p id="register-message" role="status" aria-live="polite"></p>
+
+    </form>
+</section>
+
+<script>
+    import {
+        signInWithEmailAndPassword,
+        createUserWithEmailAndPassword,
+    } from "firebase/auth";
+
+    import { FirebaseError } from "firebase/app";
+
+    import {
+        doc,
+        setDoc,
+        serverTimestamp,
+    } from "firebase/firestore";
+
+    import { auth, db } from "../firebase.js";
+
+
+    // ELEMENTS
+
+    const loginForm = document.querySelector<HTMLFormElement>("#login-form");
+    const loginEmail = document.querySelector<HTMLInputElement>("#login-email");
+    const loginPassword = document.querySelector<HTMLInputElement>("#login-password");
+    const loginMessage = document.querySelector<HTMLParagraphElement>("#login-message");
+
+    const registerForm = document.querySelector<HTMLFormElement>("#register-form");
+    const registerEmail = document.querySelector<HTMLInputElement>("#register-email");
+    const registerPassword = document.querySelector<HTMLInputElement>("#register-password");
+    const confirmPassword = document.querySelector<HTMLInputElement>("#confirm-password");
+    const registerUsername = document.querySelector<HTMLInputElement>("#register-username");
+    const registerMessage = document.querySelector<HTMLParagraphElement>("#register-message");
+
+
+    // LOGIN
+
+    loginForm?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        if (!loginEmail || !loginPassword || !loginMessage) return;
+
+        const email = loginEmail.value.trim();
+        const password = loginPassword.value;
+
+        loginMessage.textContent = "Logging in...";
+
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+
+            window.location.href = "/";
+
+        } catch (error: unknown) {
+            loginMessage.textContent = "Login failed. Check your email and password.";
+
+            if (error instanceof FirebaseError) {
+                console.error("Login error:", error.code);
+            }
+        }
+    });
+
+
+    // REGISTRATION
+
+    registerForm?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        if (
+            !registerEmail ||
+            !registerPassword ||
+            !confirmPassword ||
+            !registerUsername ||
+            !registerMessage
+        ) return;
+
+        const email = registerEmail.value.trim();
+        const password = registerPassword.value;
+        const username = registerUsername.value.trim();
+        const usernameLower = username.toLowerCase();
+
+        // VALIDATE PASSWORDS
+
+        if (password !== confirmPassword.value) {
+            registerMessage.textContent = "Passwords do not match.";
+            confirmPassword.focus();
+            return;
+        }
+
+        registerMessage.textContent = "Creating account...";
+
+        try {
+            // CREATE AUTHENTICATION ACCOUNT
+
+            const credential = await createUserWithEmailAndPassword(
+                auth,
+                email,
+                password
+            );
+
+            const user = credential.user;
+
+
+            // CREATE FIRESTORE DOCUMENT
+
+            await setDoc(doc(db, "users", user.uid), {
+                createdAt: serverTimestamp(),
+                email: user.email,
+                uid: user.uid,
+                username: username,
+                usernameLower: usernameLower,
+            });
+
+            window.location.href = "/";
+
+        } catch (error: unknown) {
+            registerMessage.textContent = "Account creation failed. Please try again.";
+
+            if (error instanceof FirebaseError) {
+
+                if (error.code === "auth/email-already-in-use") {
+                    registerMessage.textContent = "This email is already registered.";
+
+                } else if (error.code === "auth/weak-password") {
+                    registerMessage.textContent = "Choose a stronger password.";
+
+                } else if (error.code === "permission-denied") {
+                    registerMessage.textContent = "Firestore permission denied. Check your security rules.";
+                }
+
+                console.error("Registration error:", error.code);
+            }
+        }
+    });
+</script>
