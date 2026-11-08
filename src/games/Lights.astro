@@ -1,191 +1,170 @@
 ---
-const { gameType } = Astro.props;
+const { gameType, gameSlug } = Astro.props;
 ---
 
-<p>Gametype: {gameType}</p>
-
-<div
-    class="container"
-    id="game-board"
-    data-game-type={gameType}
-></div>
+<div id="game-board" data-game-type={gameType} data-game-slug={gameSlug}></div>
+<p id="game-status" role="status" aria-live="polite"></p>
+<button id="retry-button" type="button" hidden>Retry</button>
 
 <script>
-    import {
-        DEFAULT_DIFFICULTY,
-        handleLevel,
-    } from "../utils/levelHandler";
+    import { DEFAULT_DIFFICULTY, handleLevel } from "../utils/levelHandler";
+    import { waitForAuth, loadDifficulty, saveDifficulty } from "../utils/gameProgress";
 
-    const gameBoard = document.getElementById("game-board");
-    const gameType = gameBoard?.dataset.gameType ?? "";
-
-    // Game state
-    const difficulty = DEFAULT_DIFFICULTY;
+    const gameBoard = document.querySelector<HTMLDivElement>("#game-board")!;
+    const status = document.querySelector<HTMLParagraphElement>("#game-status")!;
+    const retryButton = document.querySelector<HTMLButtonElement>("#retry-button")!;
+    const gameType = gameBoard.dataset.gameType ?? "";
+    const gameSlug = gameBoard.dataset.gameSlug ?? "";
 
     const lightCount = 6;
     const roundsPerSession = 2;
-    const flashAmount = 5 + difficulty;
-
     const initialDelay = 250;
     const flashDuration = 500;
     const flashDelay = 250;
     const clickDuration = 200;
     const roundDelay = 1000;
+    const sessionDelay = 1000;
 
+    let user: Awaited<ReturnType<typeof waitForAuth>> = null;
+    let difficulty = DEFAULT_DIFFICULTY;
     let sequence: number[] = [];
     let playerSequence: number[] = [];
-
     let wins = 0;
     let losses = 0;
     let currentRound = 0;
-
     let gameLocked = true;
     let gameFinished = false;
+    let saving = false;
+    let pendingResult: { wins: number; losses: number } | null = null;
 
-    let pendingResult: {
-        wins: number;
-        losses: number;
-    } | null = null;
+    const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-    // Generate a random sequence.
     function generateSequence() {
         sequence = [];
-
+        const flashAmount = 5 + difficulty;
         for (let i = 0; i < flashAmount; i++) {
             sequence.push(Math.floor(Math.random() * lightCount));
         }
     }
 
-    // Render lights.
     function renderLights() {
-        const board = gameBoard;
-
-        if (!board) return;
-
-        board.innerHTML = "";
-
+        gameBoard.innerHTML = "";
         for (let i = 0; i < lightCount; i++) {
             const light = document.createElement("div");
-
             light.classList.add("light");
-
-            light.addEventListener("click", () => {
-                clickLight(i, light);
-            });
-
-            board.appendChild(light);
+            light.addEventListener("click", () => clickLight(i, light));
+            gameBoard.appendChild(light);
         }
     }
 
-    // Flash the sequence.
     async function flashSequence() {
         gameLocked = true;
-
-        const lights = document.querySelectorAll<HTMLDivElement>(
-            "#game-board .light"
-        );
-
-        await new Promise(resolve => setTimeout(resolve, initialDelay));
+        const lights = gameBoard.querySelectorAll<HTMLDivElement>(".light");
+        await sleep(initialDelay);
 
         for (const index of sequence) {
             lights[index].classList.add("active");
-
-            await new Promise(resolve => setTimeout(resolve, flashDuration));
-
+            await sleep(flashDuration);
             lights[index].classList.remove("active");
-
-            await new Promise(resolve => setTimeout(resolve, flashDelay));
+            await sleep(flashDelay);
         }
 
         gameLocked = false;
     }
 
-    // Handle player clicks.
     function clickLight(index: number, light: HTMLDivElement) {
         if (gameLocked || gameFinished) return;
 
         playerSequence.push(index);
-
         light.classList.add("active");
-
-        setTimeout(() => {
-            light.classList.remove("active");
-        }, clickDuration);
+        setTimeout(() => light.classList.remove("active"), clickDuration);
 
         const currentIndex = playerSequence.length - 1;
-
         if (sequence[currentIndex] !== index) {
             finishRound(false);
-            return;
-        }
-
-        if (playerSequence.length === sequence.length) {
+        } else if (playerSequence.length === sequence.length) {
             finishRound(true);
         }
     }
 
-    // Finish the current round.
     function finishRound(won: boolean) {
         gameLocked = true;
-
-        if (won) {
-            wins++;
-        } else {
-            losses++;
-        }
-
+        if (won) wins++;
+        else losses++;
         currentRound++;
 
         if (currentRound === roundsPerSession) {
-            finishGame();
+            gameFinished = true;
+            pendingResult = { wins, losses };
+            void finishGame();
         } else {
             setTimeout(startRound, roundDelay);
         }
     }
 
-    // Finish the session.
-    function finishGame() {
-        gameFinished = true;
+    async function finishGame() {
+        if (!pendingResult || saving) return;
+        saving = true;
+        retryButton.hidden = true;
 
-        pendingResult = {
-            wins,
-            losses,
-        };
+        const levelResult = handleLevel(gameType, difficulty, pendingResult);
+        status.textContent = "Saving progress...";
 
-        const levelResult = handleLevel(
-            gameType,
-            difficulty,
-            pendingResult
-        );
-
-        console.log("Game finished:", pendingResult);
-        console.log("Level:", levelResult.levelChange);
-        console.log("Next difficulty:", levelResult.difficulty);
+        try {
+            await saveDifficulty(gameSlug, levelResult.difficulty, user);
+            difficulty = levelResult.difficulty;
+            pendingResult = null;
+            status.textContent = `Session complete. Difficulty: ${difficulty}.`;
+            await sleep(sessionDelay);
+            startGame();
+        } catch (error) {
+            console.error("Could not save Lights progress:", error);
+            status.textContent = "Could not save progress. Retry to continue.";
+            retryButton.hidden = false;
+        } finally {
+            saving = false;
+        }
     }
 
-    // Start a round.
     function startRound() {
         playerSequence = [];
-
         generateSequence();
-        flashSequence();
+        void flashSequence();
     }
 
-    // Initialize the game.
     function startGame() {
         wins = 0;
         losses = 0;
         currentRound = 0;
-
         gameFinished = false;
         gameLocked = true;
         pendingResult = null;
-
+        status.textContent = "";
+        retryButton.hidden = true;
         renderLights();
         startRound();
     }
 
-    startGame();
+    async function initializeGame() {
+        retryButton.hidden = true;
+        status.textContent = "Loading progress...";
+        try {
+            user = await waitForAuth();
+            difficulty = await loadDifficulty(gameSlug, user);
+            startGame();
+        } catch (error) {
+            console.error("Could not load Lights progress:", error);
+            status.textContent = "Could not load progress. Retry to play.";
+            retryButton.hidden = false;
+        }
+    }
+
+    retryButton.addEventListener("click", () => {
+        if (gameFinished) void finishGame();
+        else void initializeGame();
+    });
+
+    void initializeGame();
 </script>
 
 <style>

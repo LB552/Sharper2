@@ -1,48 +1,43 @@
 ---
-const { gameType } = Astro.props;
+const { gameType, gameSlug } = Astro.props;
 ---
 
-<p>Gametype: {gameType}</p>
-
-<div
-    class="container"
-    id="game-board"
-    data-game-type={gameType}
-></div>
+<div id="game-board" data-game-type={gameType} data-game-slug={gameSlug}></div>
+<p id="game-status" role="status" aria-live="polite"></p>
+<button id="retry-button" type="button" hidden>Retry</button>
 
 <script>
-    import {
-        DEFAULT_DIFFICULTY,
-        handleLevel,
-    } from "../utils/levelHandler";
+    import { DEFAULT_DIFFICULTY, handleLevel } from "../utils/levelHandler";
+    import { waitForAuth, loadDifficulty, saveDifficulty } from "../utils/gameProgress";
 
-    const gameBoard = document.getElementById("game-board");
-    const gameType = gameBoard?.dataset.gameType ?? "";
+    const gameBoard = document.querySelector<HTMLDivElement>("#game-board")!;
+    const status = document.querySelector<HTMLParagraphElement>("#game-status")!;
+    const retryButton = document.querySelector<HTMLButtonElement>("#retry-button")!;
+    const gameType = gameBoard.dataset.gameType ?? "";
+    const gameSlug = gameBoard.dataset.gameSlug ?? "";
+    const sessionDelay = 1000;
 
-    // Game state
-    const difficulty = DEFAULT_DIFFICULTY;
-
+    let user: Awaited<ReturnType<typeof waitForAuth>> = null;
+    let difficulty = DEFAULT_DIFFICULTY;
     let flaggedCards = new Set<number>();
     let goodPoints = 0;
     let badPoints = 0;
-
     let firstCard: HTMLDivElement | null = null;
     let firstIndex: number | null = null;
     let firstWasFlagged = false;
-
-    let lockBoard = false;
+    let lockBoard = true;
     let matchedPairs = 0;
     let gameFinished = false;
-
+    let saving = false;
     let pendingResult: {
         goodPoints: number;
         badPoints: number;
         percentage: number;
     } | null = null;
-
     let cards: number[] = [];
 
-    // Generate and shuffle cards.
+    const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
     function generateCards() {
         const cardAmount = 10 + difficulty * 2;
         const numberLabels: number[] = [];
@@ -51,69 +46,36 @@ const { gameType } = Astro.props;
             numberLabels.push(i, i);
         }
 
-        // Fisher-Yates shuffle.
         for (let i = numberLabels.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-
-            [numberLabels[i], numberLabels[j]] = [
-                numberLabels[j],
-                numberLabels[i],
-            ];
+            [numberLabels[i], numberLabels[j]] = [numberLabels[j], numberLabels[i]];
         }
-
         cards = numberLabels;
     }
 
-    // Render cards.
     function renderCards() {
-        const board = gameBoard;
-
-        if (!board) return;
-
-        board.innerHTML = "";
-
-        board.style.gridTemplateColumns =
-            `repeat(${Math.min(5, cards.length)}, 1fr)`;
-
+        gameBoard.innerHTML = "";
         cards.forEach((number, index) => {
             const card = document.createElement("div");
-
             card.classList.add("card");
             card.textContent = "?";
-
-            card.addEventListener("click", () => {
-                flipCard(card, index, number);
-            });
-
-            board.appendChild(card);
+            card.addEventListener("click", () => flipCard(card, index, number));
+            gameBoard.appendChild(card);
         });
     }
 
-    // Handle a card being flipped.
-    function flipCard(
-        card: HTMLDivElement,
-        index: number,
-        number: number
-    ) {
+    function flipCard(card: HTMLDivElement, index: number, number: number) {
         if (
-            lockBoard ||
-            gameFinished ||
-            card === firstCard ||
+            lockBoard || gameFinished || card === firstCard ||
             card.classList.contains("matched") ||
             card.classList.contains("flipped")
-        ) {
-            return;
-        }
+        ) return;
 
-        // Was this card seen before?
         const wasFlagged = flaggedCards.has(index);
-
         flaggedCards.add(index);
-
         card.classList.add("flipped");
         card.textContent = String(number);
 
-        // First card.
         if (firstCard === null) {
             firstCard = card;
             firstIndex = index;
@@ -121,46 +83,40 @@ const { gameType } = Astro.props;
             return;
         }
 
-        // Second card.
         lockBoard = true;
-
         const previousCard = firstCard;
         const previousIndex = firstIndex!;
 
         if (cards[previousIndex] === cards[index]) {
-            // Correct match.
             goodPoints++;
-
             previousCard.classList.add("matched");
             card.classList.add("matched");
-
             matchedPairs++;
-
             resetTurn();
 
-            // Check whether the game is finished.
             if (matchedPairs === cards.length / 2) {
-                finishGame();
+                gameFinished = true;
+                lockBoard = true;
+                const totalPoints = goodPoints + badPoints;
+                pendingResult = {
+                    goodPoints,
+                    badPoints,
+                    percentage: totalPoints === 0 ? 0 : (goodPoints / totalPoints) * 100,
+                };
+                void finishGame();
             }
         } else {
-            // Incorrect match.
-            if (firstWasFlagged || wasFlagged) {
-                badPoints++;
-            }
-
+            if (firstWasFlagged || wasFlagged) badPoints++;
             setTimeout(() => {
                 previousCard.classList.remove("flipped");
                 card.classList.remove("flipped");
-
                 previousCard.textContent = "?";
                 card.textContent = "?";
-
                 resetTurn();
             }, 1000);
         }
     }
 
-    // Reset the current turn.
     function resetTurn() {
         firstCard = null;
         firstIndex = null;
@@ -168,56 +124,67 @@ const { gameType } = Astro.props;
         lockBoard = false;
     }
 
-    // Finish the game.
-    function finishGame(): number {
-        gameFinished = true;
+    async function finishGame() {
+        if (!pendingResult || saving) return;
+        saving = true;
+        retryButton.hidden = true;
 
-        const totalPoints = goodPoints + badPoints;
+        const levelResult = handleLevel(gameType, difficulty, pendingResult);
+        status.textContent = "Saving progress...";
 
-        const percentage = totalPoints === 0
-            ? 0
-            : (goodPoints / totalPoints) * 100;
-
-        pendingResult = {
-            goodPoints,
-            badPoints,
-            percentage,
-        };
-
-        const levelResult = handleLevel(
-            gameType,
-            difficulty,
-            pendingResult
-        );
-
-        console.log("Game finished:", pendingResult);
-        console.log("Level:", levelResult.levelChange);
-        console.log("Next difficulty:", levelResult.difficulty);
-
-        return percentage;
+        try {
+            await saveDifficulty(gameSlug, levelResult.difficulty, user);
+            difficulty = levelResult.difficulty;
+            pendingResult = null;
+            status.textContent = `Session complete. Difficulty: ${difficulty}.`;
+            await sleep(sessionDelay);
+            startGame();
+        } catch (error) {
+            console.error("Could not save Memory progress:", error);
+            status.textContent = "Could not save progress. Retry to continue.";
+            retryButton.hidden = false;
+        } finally {
+            saving = false;
+        }
     }
 
-    // Initialize the game.
     function startGame() {
         flaggedCards.clear();
-
         goodPoints = 0;
         badPoints = 0;
         matchedPairs = 0;
-
         firstCard = null;
         firstIndex = null;
         firstWasFlagged = false;
-
         lockBoard = false;
         gameFinished = false;
         pendingResult = null;
-
+        status.textContent = "";
+        retryButton.hidden = true;
         generateCards();
         renderCards();
     }
 
-    startGame();
+    async function initializeGame() {
+        retryButton.hidden = true;
+        status.textContent = "Loading progress...";
+        try {
+            user = await waitForAuth();
+            difficulty = await loadDifficulty(gameSlug, user);
+            startGame();
+        } catch (error) {
+            console.error("Could not load Memory progress:", error);
+            status.textContent = "Could not load progress. Retry to play.";
+            retryButton.hidden = false;
+        }
+    }
+
+    retryButton.addEventListener("click", () => {
+        if (gameFinished) void finishGame();
+        else void initializeGame();
+    });
+
+    void initializeGame();
 </script>
 
 <style>
@@ -239,15 +206,6 @@ const { gameType } = Astro.props;
         flex: 0 0 50px;
         background-color: white;
         border: 2px solid royalblue;
-    }
-
-    #game-board :global(.number) {
-        display: none;
-        color: black;
-        font-size: 20px;
-    }
-
-    #game-board :global(.card.flipped .number) {
-        display: inline;
+        cursor: pointer;
     }
 </style>
