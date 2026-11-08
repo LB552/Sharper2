@@ -1,0 +1,31 @@
+---
+---
+
+<html>
+  <head>
+    <title>Test Firebase Game Save</title>
+  </head>
+  <body>
+    <h1>Firebase Game Save Test</h1>
+
+    <button id="testSave">Save Memory Level 2</button>
+
+    <p id="result"></p>
+
+    <script>
+      import { saveTest } from '../utils/testGameSave.js';
+
+      document.querySelector('#testSave')?.addEventListener('click', async () => {
+        const result = document.querySelector('#result');
+
+        try {
+          await saveTest();
+          result!.textContent = 'Successfully saved!';
+        } catch (error) {
+          console.error(error);
+          result!.textContent = 'Error saving data. Check console.';
+        }
+      });
+    </script>
+  </body>
+</html>
