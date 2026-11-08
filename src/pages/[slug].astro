@@ -11,7 +11,8 @@ export async function getStaticPaths() {
     *[_type == "game" && defined(slug.current)] {
       "slug": slug.current,
       title,
-      description
+      description,
+      gameType
     }
   `);
 
@@ -35,7 +36,7 @@ const GameComponent = {
     <p>{game.description}</p>
 
     <section class="game-window">
-        {GameComponent && <GameComponent />}
+        {GameComponent && <GameComponent gameType={game.gameType} />}
     </section>
 </Layout>
 

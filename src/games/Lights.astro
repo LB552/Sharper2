@@ -1,1 +1,191 @@
-<h1>Lights temp placeholder</h1>
+---
+const { gameType } = Astro.props;
+---
+
+<p>Gametype: {gameType}</p>
+
+<div class="container" id="game-board"></div>
+
+<script>
+    // Game state
+    const difficulty = 0;
+
+    const lightCount = 6;
+    const roundsPerSession = 2;
+    const flashAmount = 5 + difficulty;
+
+    const initialDelay = 250;
+    const flashDuration = 500;
+    const flashDelay = 250;
+    const clickDuration = 200;
+    const roundDelay = 1000;
+
+    let sequence: number[] = [];
+    let playerSequence: number[] = [];
+
+    let wins = 0;
+    let losses = 0;
+    let currentRound = 0;
+
+    let gameLocked = true;
+    let gameFinished = false;
+
+    let pendingResult: {
+        wins: number;
+        losses: number;
+    } | null = null;
+
+    // Generate a random sequence.
+    function generateSequence() {
+        sequence = [];
+
+        for (let i = 0; i < flashAmount; i++) {
+            sequence.push(Math.floor(Math.random() * lightCount));
+        }
+    }
+
+    // Render lights.
+    function renderLights() {
+        const board = document.getElementById("game-board");
+
+        if (!board) return;
+
+        board.innerHTML = "";
+
+        for (let i = 0; i < lightCount; i++) {
+            const light = document.createElement("div");
+
+            light.classList.add("light");
+
+            light.addEventListener("click", () => {
+                clickLight(i, light);
+            });
+
+            board.appendChild(light);
+        }
+    }
+
+    // Flash the sequence.
+    async function flashSequence() {
+        gameLocked = true;
+
+        const lights = document.querySelectorAll<HTMLDivElement>(
+            "#game-board .light"
+        );
+
+        await new Promise(resolve => setTimeout(resolve, initialDelay));
+
+        for (const index of sequence) {
+            lights[index].classList.add("active");
+
+            await new Promise(resolve => setTimeout(resolve, flashDuration));
+
+            lights[index].classList.remove("active");
+
+            await new Promise(resolve => setTimeout(resolve, flashDelay));
+        }
+
+        gameLocked = false;
+    }
+
+    // Handle player clicks.
+    function clickLight(index: number, light: HTMLDivElement) {
+        if (gameLocked || gameFinished) return;
+
+        playerSequence.push(index);
+
+        light.classList.add("active");
+
+        setTimeout(() => {
+            light.classList.remove("active");
+        }, clickDuration);
+
+        const currentIndex = playerSequence.length - 1;
+
+        if (sequence[currentIndex] !== index) {
+            finishRound(false);
+            return;
+        }
+
+        if (playerSequence.length === sequence.length) {
+            finishRound(true);
+        }
+    }
+
+    // Finish the current round.
+    function finishRound(won: boolean) {
+        gameLocked = true;
+
+        if (won) {
+            wins++;
+        } else {
+            losses++;
+        }
+
+        currentRound++;
+
+        if (currentRound === roundsPerSession) {
+            finishGame();
+        } else {
+            setTimeout(startRound, roundDelay);
+        }
+    }
+
+    // Finish the session.
+    function finishGame() {
+        gameFinished = true;
+
+        pendingResult = {
+            wins,
+            losses,
+        };
+
+        console.log("Game finished:", pendingResult);
+    }
+
+    // Start a round.
+    function startRound() {
+        playerSequence = [];
+
+        generateSequence();
+        flashSequence();
+    }
+
+    // Initialize the game.
+    function startGame() {
+        wins = 0;
+        losses = 0;
+        currentRound = 0;
+
+        gameFinished = false;
+        gameLocked = true;
+        pendingResult = null;
+
+        renderLights();
+        startRound();
+    }
+
+    startGame();
+</script>
+
+<style>
+    #game-board {
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+        padding: 10px;
+    }
+
+    #game-board :global(.light) {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background-color: white;
+        border: 2px solid royalblue;
+        cursor: pointer;
+    }
+
+    #game-board :global(.light.active) {
+        background-color: royalblue;
+    }
+</style>
