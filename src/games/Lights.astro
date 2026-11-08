@@ -4,11 +4,23 @@ const { gameType } = Astro.props;
 
 <p>Gametype: {gameType}</p>
 
-<div class="container" id="game-board"></div>
+<div
+    class="container"
+    id="game-board"
+    data-game-type={gameType}
+></div>
 
 <script>
+    import {
+        DEFAULT_DIFFICULTY,
+        handleLevel,
+    } from "../utils/levelHandler";
+
+    const gameBoard = document.getElementById("game-board");
+    const gameType = gameBoard?.dataset.gameType ?? "";
+
     // Game state
-    const difficulty = 0;
+    const difficulty = DEFAULT_DIFFICULTY;
 
     const lightCount = 6;
     const roundsPerSession = 2;
@@ -46,7 +58,7 @@ const { gameType } = Astro.props;
 
     // Render lights.
     function renderLights() {
-        const board = document.getElementById("game-board");
+        const board = gameBoard;
 
         if (!board) return;
 
@@ -140,7 +152,15 @@ const { gameType } = Astro.props;
             losses,
         };
 
+        const levelResult = handleLevel(
+            gameType,
+            difficulty,
+            pendingResult
+        );
+
         console.log("Game finished:", pendingResult);
+        console.log("Level:", levelResult.levelChange);
+        console.log("Next difficulty:", levelResult.difficulty);
     }
 
     // Start a round.
