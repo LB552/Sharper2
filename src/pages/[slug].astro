@@ -1,6 +1,8 @@
 ---
 import { sanityClient } from 'sanity:client';
 
+import Layout from '../layouts/Layout.astro';
+
 import MemoryGame from '../games/Memory.astro';
 import LightsGame from '../games/Lights.astro';
 
@@ -28,12 +30,14 @@ const GameComponent = {
 }[game.slug];
 ---
 
-<h1>{game.title}</h1>
-<p>{game.description}</p>
+<Layout title={game.title}>
+    <h1>{game.title}</h1>
+    <p>{game.description}</p>
 
-<section class="game-window">
-    {GameComponent && <GameComponent />}
-</section>
+    <section class="game-window">
+        {GameComponent && <GameComponent />}
+    </section>
+</Layout>
 
 <style>
     .game-window {

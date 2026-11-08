@@ -1,0 +1,10 @@
+@import url('https://fonts.googleapis.com/css2?family=Huninn&display=swap');
+
+:root {
+  --default-font: "Huninn", sans-serif;
+}
+
+html,
+body {
+  font-family: var(--default-font);
+}

@@ -1,1 +1,227 @@
-<h1>Memory Game placeholder</h1>
+<div class="container" id="game-board"></div>
+
+<script>
+    // Game state
+    const difficulty = 0;
+
+    let flaggedCards = new Set<number>();
+    let goodPoints = 0;
+    let badPoints = 0;
+
+    let firstCard: HTMLDivElement | null = null;
+    let firstIndex: number | null = null;
+    let firstWasFlagged = false;
+
+    let lockBoard = false;
+    let matchedPairs = 0;
+    let gameFinished = false;
+
+    let pendingResult: {
+        goodPoints: number;
+        badPoints: number;
+        percentage: number;
+    } | null = null;
+
+    let cards: number[] = [];
+
+    // Generate and shuffle cards.
+    function generateCards() {
+        const cardAmount = 10 + difficulty * 2;
+        const numberLabels: number[] = [];
+
+        for (let i = 1; i <= cardAmount / 2; i++) {
+            numberLabels.push(i, i);
+        }
+
+        // Fisher-Yates shuffle.
+        for (let i = numberLabels.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+
+            [numberLabels[i], numberLabels[j]] = [
+                numberLabels[j],
+                numberLabels[i],
+            ];
+        }
+
+        cards = numberLabels;
+    }
+
+    // Render cards.
+    function renderCards() {
+        const board = document.getElementById("game-board");
+
+        if (!board) return;
+
+        board.innerHTML = "";
+
+        board.style.gridTemplateColumns =
+            `repeat(${Math.min(5, cards.length)}, 1fr)`;
+
+        cards.forEach((number, index) => {
+            const card = document.createElement("div");
+
+            card.classList.add("card");
+            card.textContent = "?";
+
+            card.addEventListener("click", () => {
+                flipCard(card, index, number);
+            });
+
+            board.appendChild(card);
+        });
+    }
+
+    // Handle a card being flipped.
+    function flipCard(
+        card: HTMLDivElement,
+        index: number,
+        number: number
+    ) {
+        if (
+            lockBoard ||
+            gameFinished ||
+            card === firstCard ||
+            card.classList.contains("matched") ||
+            card.classList.contains("flipped")
+        ) {
+            return;
+        }
+
+        // Was this card seen before?
+        const wasFlagged = flaggedCards.has(index);
+
+        flaggedCards.add(index);
+
+        card.classList.add("flipped");
+        card.textContent = String(number);
+
+        // First card.
+        if (firstCard === null) {
+            firstCard = card;
+            firstIndex = index;
+            firstWasFlagged = wasFlagged;
+            return;
+        }
+
+        // Second card.
+        lockBoard = true;
+
+        const previousCard = firstCard;
+        const previousIndex = firstIndex!;
+
+        if (cards[previousIndex] === cards[index]) {
+            // Correct match.
+            goodPoints++;
+
+            previousCard.classList.add("matched");
+            card.classList.add("matched");
+
+            matchedPairs++;
+
+            resetTurn();
+
+            // Check whether the game is finished.
+            if (matchedPairs === cards.length / 2) {
+                finishGame();
+            }
+        } else {
+            // Incorrect match.
+            if (firstWasFlagged || wasFlagged) {
+                badPoints++;
+            }
+
+            setTimeout(() => {
+                previousCard.classList.remove("flipped");
+                card.classList.remove("flipped");
+
+                previousCard.textContent = "?";
+                card.textContent = "?";
+
+                resetTurn();
+            }, 1000);
+        }
+    }
+
+    // Reset the current turn.
+    function resetTurn() {
+        firstCard = null;
+        firstIndex = null;
+        firstWasFlagged = false;
+        lockBoard = false;
+    }
+
+    // Finish the game.
+    function finishGame(): number {
+        gameFinished = true;
+
+        const totalPoints = goodPoints + badPoints;
+
+        const percentage = totalPoints === 0
+            ? 0
+            : (goodPoints / totalPoints) * 100;
+
+        pendingResult = {
+            goodPoints,
+            badPoints,
+            percentage,
+        };
+
+        console.log("Game finished:", pendingResult);
+
+        return percentage;
+    }
+
+    // Initialize the game.
+    function startGame() {
+        flaggedCards.clear();
+
+        goodPoints = 0;
+        badPoints = 0;
+        matchedPairs = 0;
+
+        firstCard = null;
+        firstIndex = null;
+        firstWasFlagged = false;
+
+        lockBoard = false;
+        gameFinished = false;
+        pendingResult = null;
+
+        generateCards();
+        renderCards();
+    }
+
+    startGame();
+</script>
+
+<style>
+    #game-board {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 10px;
+    }
+
+    #game-board :global(.card) {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        border-radius: 8px;
+        width: 50px;
+        height: 50px;
+        flex: 0 0 50px;
+        background-color: white;
+        border: 2px solid royalblue;
+    }
+
+    #game-board :global(.number) {
+        display: none;
+        color: black;
+        font-size: 20px;
+    }
+
+    #game-board :global(.card.flipped .number) {
+        display: inline;
+    }
+</style>

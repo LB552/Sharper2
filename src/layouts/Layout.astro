@@ -1,0 +1,17 @@
+---
+import "../index.css";
+
+const { title = "Sharper" } = Astro.props;
+---
+
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width" />
+        <title>{title}</title>
+    </head>
+
+    <body>
+        <slot />
+    </body>
+</html>
