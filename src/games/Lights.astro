@@ -1,5 +1,5 @@
 ---
-const { gameTitle, gameType, gameSlug } = Astro.props;
+const { gameTitle = "Lights", gameType, gameSlug } = Astro.props;
 ---
 
 <div id="game-board" data-game-type={gameType} data-game-slug={gameSlug} hidden></div>
@@ -8,18 +8,27 @@ const { gameTitle, gameType, gameSlug } = Astro.props;
     <p>Create a free account to play {gameTitle} and all other Sharper games.</p>
     <a href="/login">Create an account</a>
 </div>
+<p id="daily-timer" role="timer" hidden>Daily time: --:--</p>
 <p id="game-status" role="status" aria-live="polite"></p>
+<div id="daily-limit-message" hidden>
+    <h2>Daily time complete</h2>
+    <p>Come back tomorrow for another five minutes of {gameTitle}.</p>
+    <a href="/">Back to games</a>
+</div>
 <button id="retry-button" type="button" hidden>Retry</button>
 
 <script>
     import { DEFAULT_DIFFICULTY, handleLevel } from "../utils/levelHandler";
     import { waitForAuth, loadDifficulty, saveDifficulty } from "../utils/gameProgress";
     import { isGameLocked } from "../utils/demoMode.js";
+    import { createDailyTimer, formatRemaining } from "../utils/dailyTimer.js";
 
     const gameBoard = document.querySelector<HTMLDivElement>("#game-board")!;
     const status = document.querySelector<HTMLParagraphElement>("#game-status")!;
     const lockedGame = document.querySelector<HTMLDivElement>("#locked-game")!;
     const retryButton = document.querySelector<HTMLButtonElement>("#retry-button")!;
+    const dailyTimerLabel = document.querySelector<HTMLParagraphElement>("#daily-timer")!;
+    const dailyLimitMessage = document.querySelector<HTMLDivElement>("#daily-limit-message")!;
     const gameType = gameBoard.dataset.gameType ?? "";
     const gameSlug = gameBoard.dataset.gameSlug ?? "";
 
@@ -34,6 +43,8 @@ const { gameTitle, gameType, gameSlug } = Astro.props;
 
     let user: Awaited<ReturnType<typeof waitForAuth>> = null;
     let difficulty = DEFAULT_DIFFICULTY;
+    let dailyTimer: ReturnType<typeof createDailyTimer> | null = null;
+    let dailyLocked = false;
     let sequence: number[] = [];
     let playerSequence: number[] = [];
     let wins = 0;
@@ -119,18 +130,47 @@ const { gameTitle, gameType, gameSlug } = Astro.props;
 
         try {
             await saveDifficulty(gameSlug, levelResult.difficulty, user);
-            difficulty = levelResult.difficulty;
-            pendingResult = null;
-            status.textContent = `Session complete. Difficulty: ${difficulty}.`;
-            await sleep(sessionDelay);
-            startGame();
         } catch (error) {
             console.error("Could not save Lights progress:", error);
             status.textContent = "Could not save progress. Retry to continue.";
             retryButton.hidden = false;
-        } finally {
             saving = false;
+            return;
         }
+
+        difficulty = levelResult.difficulty;
+        pendingResult = null;
+        status.textContent = `Session complete. Difficulty: ${difficulty}.`;
+        await sleep(sessionDelay);
+        saving = false;
+        try {
+            await startNextSession();
+        } catch (error) {
+            reportTimerError(error);
+            retryButton.hidden = false;
+        }
+    }
+
+    function showDailyLimit() {
+        dailyLocked = true;
+        gameFinished = true;
+        gameLocked = true;
+        gameBoard.hidden = true;
+        dailyLimitMessage.hidden = false;
+        retryButton.hidden = true;
+        status.textContent = "Today's five minutes are complete.";
+    }
+
+    async function startNextSession() {
+        // Only deny a new session, never an already-running round/session.
+        if (!dailyTimer || !(await dailyTimer.canStartSession())) {
+            showDailyLimit();
+            return;
+        }
+        dailyLocked = false;
+        gameBoard.hidden = false;
+        dailyLimitMessage.hidden = true;
+        startGame();
     }
 
     function startRound() {
@@ -152,6 +192,11 @@ const { gameTitle, gameType, gameSlug } = Astro.props;
         startRound();
     }
 
+    function reportTimerError(error: unknown) {
+        console.error("Daily timer error:", error);
+        status.textContent = "Could not load daily playtime. Please retry.";
+    }
+
     async function initializeGame() {
         retryButton.hidden = true;
         status.textContent = "Loading progress...";
@@ -164,10 +209,23 @@ const { gameTitle, gameType, gameSlug } = Astro.props;
                 status.textContent = "";
                 return;
             }
+            dailyTimer?.stop();
+            dailyTimer = createDailyTimer({
+                gameSlug,
+                user,
+                onTick: (remaining) => {
+                    dailyTimerLabel.textContent = `Daily time: ${formatRemaining(remaining)}`;
+                },
+                onNewDay: () => {
+                    if (dailyLocked) void startNextSession().catch(reportTimerError);
+                },
+                onError: reportTimerError,
+            });
+            await dailyTimer.start();
             difficulty = await loadDifficulty(gameSlug, user);
             lockedGame.hidden = true;
-            gameBoard.hidden = false;
-            startGame();
+            dailyTimerLabel.hidden = false;
+            await startNextSession();
         } catch (error) {
             console.error("Could not load Lights progress:", error);
             status.textContent = "Could not load progress. Retry to play.";
@@ -176,10 +234,11 @@ const { gameTitle, gameType, gameSlug } = Astro.props;
     }
 
     retryButton.addEventListener("click", () => {
-        if (gameFinished) void finishGame();
+        if (pendingResult) void finishGame();
         else void initializeGame();
     });
 
+    window.addEventListener("pagehide", () => dailyTimer?.stop());
     void initializeGame();
 </script>
 
@@ -192,9 +251,15 @@ const { gameTitle, gameType, gameSlug } = Astro.props;
     }
 
     #game-board[hidden],
-    #locked-game[hidden] {
+    #locked-game[hidden],
+    #daily-timer[hidden],
+    #daily-limit-message[hidden] {
         display: none;
     }
+
+    #daily-timer { font-variant-numeric: tabular-nums; font-weight: bold; }
+
+    #daily-limit-message { text-align: center; padding: 1rem; }
 
     #locked-game {
         text-align: center;

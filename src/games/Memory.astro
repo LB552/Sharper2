@@ -1,9 +1,15 @@
 ---
-const { gameTitle, gameType, gameSlug } = Astro.props;
+const { gameTitle = "Memory", gameType, gameSlug } = Astro.props;
 ---
 
 <div id="game-board" data-game-type={gameType} data-game-slug={gameSlug}></div>
+<p id="daily-timer" role="timer">Daily time: --:--</p>
 <p id="game-status" role="status" aria-live="polite"></p>
+<div id="daily-limit-message" hidden>
+    <h2>Daily time complete</h2>
+    <p>Come back tomorrow for another five minutes of {gameTitle}.</p>
+    <a href="/">Back to games</a>
+</div>
 <button id="retry-button" type="button" hidden>Retry</button>
 
 <dialog id="demo-limit-dialog" aria-labelledby="demo-limit-title">
@@ -19,17 +25,22 @@ const { gameTitle, gameType, gameSlug } = Astro.props;
     import { DEFAULT_DIFFICULTY, handleLevel } from "../utils/levelHandler";
     import { waitForAuth, loadDifficulty, saveDifficulty } from "../utils/gameProgress";
     import { hasReachedDemoLimit, recordDemoSession } from "../utils/demoMode.js";
+    import { createDailyTimer, formatRemaining } from "../utils/dailyTimer.js";
 
     const gameBoard = document.querySelector<HTMLDivElement>("#game-board")!;
     const status = document.querySelector<HTMLParagraphElement>("#game-status")!;
     const retryButton = document.querySelector<HTMLButtonElement>("#retry-button")!;
     const demoDialog = document.querySelector<HTMLDialogElement>("#demo-limit-dialog")!;
+    const dailyTimerLabel = document.querySelector<HTMLParagraphElement>("#daily-timer")!;
+    const dailyLimitMessage = document.querySelector<HTMLDivElement>("#daily-limit-message")!;
     const gameType = gameBoard.dataset.gameType ?? "";
     const gameSlug = gameBoard.dataset.gameSlug ?? "";
     const sessionDelay = 1000;
 
     let user: Awaited<ReturnType<typeof waitForAuth>> = null;
     let difficulty = DEFAULT_DIFFICULTY;
+    let dailyTimer: ReturnType<typeof createDailyTimer> | null = null;
+    let dailyLocked = false;
     let flaggedCards = new Set<number>();
     let goodPoints = 0;
     let badPoints = 0;
@@ -145,25 +156,54 @@ const { gameTitle, gameType, gameSlug } = Astro.props;
 
         try {
             await saveDifficulty(gameSlug, levelResult.difficulty, user);
-            difficulty = levelResult.difficulty;
-            if (!user) {
-                recordDemoSession();
-            }
-            pendingResult = null;
-            status.textContent = `Session complete. Difficulty: ${difficulty}.`;
-            if (!user && hasReachedDemoLimit()) {
-                showDemoLimit();
-                return;
-            }
-            await sleep(sessionDelay);
-            startGame();
         } catch (error) {
             console.error("Could not save Memory progress:", error);
             status.textContent = "Could not save progress. Retry to continue.";
             retryButton.hidden = false;
-        } finally {
             saving = false;
+            return;
         }
+
+        difficulty = levelResult.difficulty;
+        if (!user) recordDemoSession();
+        pendingResult = null;
+        status.textContent = `Session complete. Difficulty: ${difficulty}.`;
+        if (!user && hasReachedDemoLimit()) {
+            saving = false;
+            showDemoLimit();
+            return;
+        }
+        await sleep(sessionDelay);
+        saving = false;
+        try {
+            await startNextSession();
+        } catch (error) {
+            reportTimerError(error);
+            retryButton.hidden = false;
+        }
+    }
+
+    function showDailyLimit() {
+        dailyLocked = true;
+        gameFinished = true;
+        lockBoard = true;
+        gameBoard.hidden = true;
+        dailyLimitMessage.hidden = false;
+        retryButton.hidden = true;
+        status.textContent = "Today's five minutes are complete.";
+    }
+
+    async function startNextSession() {
+        // The session currently underway is always allowed to finish.
+        // Only check the deadline before starting the next session.
+        if (!dailyTimer || !(await dailyTimer.canStartSession())) {
+            showDailyLimit();
+            return;
+        }
+        dailyLocked = false;
+        gameBoard.hidden = false;
+        dailyLimitMessage.hidden = true;
+        startGame();
     }
 
     function showDemoLimit() {
@@ -191,6 +231,12 @@ const { gameTitle, gameType, gameSlug } = Astro.props;
         renderCards();
     }
 
+    function reportTimerError(error: unknown) {
+        console.error("Daily timer error:", error);
+        status.textContent = "Could not load daily playtime. Please retry.";
+        // Do not begin another session if rollover couldn't be verified.
+    }
+
     async function initializeGame() {
         retryButton.hidden = true;
         status.textContent = "Loading progress...";
@@ -200,8 +246,23 @@ const { gameTitle, gameType, gameSlug } = Astro.props;
                 showDemoLimit();
                 return;
             }
+            dailyTimer?.stop();
+            dailyTimer = createDailyTimer({
+                gameSlug,
+                user,
+                onTick: (remaining) => {
+                    dailyTimerLabel.textContent = `Daily time: ${formatRemaining(remaining)}`;
+                },
+                onNewDay: () => {
+                    if (dailyLocked && (user || !hasReachedDemoLimit())) {
+                        void startNextSession().catch(reportTimerError);
+                    }
+                },
+                onError: reportTimerError,
+            });
+            await dailyTimer.start();
             difficulty = await loadDifficulty(gameSlug, user);
-            startGame();
+            await startNextSession();
         } catch (error) {
             console.error("Could not load Memory progress:", error);
             status.textContent = "Could not load progress. Retry to play.";
@@ -210,10 +271,11 @@ const { gameTitle, gameType, gameSlug } = Astro.props;
     }
 
     retryButton.addEventListener("click", () => {
-        if (gameFinished) void finishGame();
+        if (pendingResult) void finishGame();
         else void initializeGame();
     });
 
+    window.addEventListener("pagehide", () => dailyTimer?.stop());
     void initializeGame();
 </script>
 
@@ -265,5 +327,19 @@ const { gameTitle, gameType, gameSlug } = Astro.props;
         background-color: white;
         border: 2px solid royalblue;
         cursor: pointer;
+    }
+    #game-board[hidden],
+    #daily-limit-message[hidden] {
+        display: none;
+    }
+
+    #daily-limit-message {
+        text-align: center;
+        padding: 1rem;
+    }
+
+    #daily-timer {
+        font-variant-numeric: tabular-nums;
+        font-weight: bold;
     }
 </style>
