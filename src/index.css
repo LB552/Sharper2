@@ -1,10 +1,16 @@
-@import url('https://fonts.googleapis.com/css2?family=Huninn&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Huninn&display=swap");
 
 :root {
-  --default-font: "Huninn", sans-serif;
+    --default-font: "Huninn", sans-serif;
+    --theme-color: royalblue;
 }
 
 html,
 body {
-  font-family: var(--default-font);
+    margin: 0;
+    font-family: var(--default-font);
+}
+
+* {
+    box-sizing: border-box;
 }
