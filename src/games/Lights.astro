@@ -1,17 +1,24 @@
 ---
-const { gameType, gameSlug } = Astro.props;
+const { gameTitle, gameType, gameSlug } = Astro.props;
 ---
 
-<div id="game-board" data-game-type={gameType} data-game-slug={gameSlug}></div>
+<div id="game-board" data-game-type={gameType} data-game-slug={gameSlug} hidden></div>
+<div id="locked-game" hidden>
+    <h2>Unlock {gameTitle}</h2>
+    <p>Create a free account to play {gameTitle} and all other Sharper games.</p>
+    <a href="/login">Create an account</a>
+</div>
 <p id="game-status" role="status" aria-live="polite"></p>
 <button id="retry-button" type="button" hidden>Retry</button>
 
 <script>
     import { DEFAULT_DIFFICULTY, handleLevel } from "../utils/levelHandler";
     import { waitForAuth, loadDifficulty, saveDifficulty } from "../utils/gameProgress";
+    import { isGameLocked } from "../utils/demoMode.js";
 
     const gameBoard = document.querySelector<HTMLDivElement>("#game-board")!;
     const status = document.querySelector<HTMLParagraphElement>("#game-status")!;
+    const lockedGame = document.querySelector<HTMLDivElement>("#locked-game")!;
     const retryButton = document.querySelector<HTMLButtonElement>("#retry-button")!;
     const gameType = gameBoard.dataset.gameType ?? "";
     const gameSlug = gameBoard.dataset.gameSlug ?? "";
@@ -150,7 +157,16 @@ const { gameType, gameSlug } = Astro.props;
         status.textContent = "Loading progress...";
         try {
             user = await waitForAuth();
+            if (isGameLocked(gameSlug, user)) {
+                gameLocked = true;
+                gameBoard.hidden = true;
+                lockedGame.hidden = false;
+                status.textContent = "";
+                return;
+            }
             difficulty = await loadDifficulty(gameSlug, user);
+            lockedGame.hidden = true;
+            gameBoard.hidden = false;
             startGame();
         } catch (error) {
             console.error("Could not load Lights progress:", error);
@@ -173,6 +189,20 @@ const { gameType, gameSlug } = Astro.props;
         justify-content: center;
         gap: 15px;
         padding: 10px;
+    }
+
+    #game-board[hidden],
+    #locked-game[hidden] {
+        display: none;
+    }
+
+    #locked-game {
+        text-align: center;
+    }
+
+    #locked-game a {
+        color: var(--theme-color);
+        font-weight: bold;
     }
 
     #game-board :global(.light) {

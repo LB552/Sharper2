@@ -32,9 +32,15 @@ const GameComponent = {
     <h1>{game.title}</h1>
     <p>{game.description}</p>
 
-    <section class="game-window">
-        {GameComponent && <GameComponent gameType={game.gameType} gameSlug={game.slug} />}
-    </section>
+  <section class="game-window">
+      {GameComponent && (
+          <GameComponent
+              gameTitle={game.title}
+              gameType={game.gameType}
+              gameSlug={game.slug}
+          />
+      )}
+  </section>
 </Layout>
 
 <style>
