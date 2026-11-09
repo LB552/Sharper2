@@ -81,20 +81,11 @@
 
 <script>
     import {
-        signInWithEmailAndPassword,
-        createUserWithEmailAndPassword,
-    } from "firebase/auth";
+        login,
+        register,
+    } from "../utils/authHandler.js";
 
     import { FirebaseError } from "firebase/app";
-
-    import {
-        doc,
-        setDoc,
-        serverTimestamp,
-    } from "firebase/firestore";
-
-    import { auth, db } from "../firebase.js";
-
 
     // ELEMENTS
 
@@ -110,7 +101,6 @@
     const registerUsername = document.querySelector<HTMLInputElement>("#register-username");
     const registerMessage = document.querySelector<HTMLParagraphElement>("#register-message");
 
-
     // LOGIN
 
     loginForm?.addEventListener("submit", async (event) => {
@@ -124,19 +114,18 @@
         loginMessage.textContent = "Logging in...";
 
         try {
-            await signInWithEmailAndPassword(auth, email, password);
+            await login(email, password);
 
             window.location.href = "/";
-
         } catch (error: unknown) {
-            loginMessage.textContent = "Login failed. Check your email and password.";
+            loginMessage.textContent =
+                "Login failed. Check your email and password.";
 
             if (error instanceof FirebaseError) {
                 console.error("Login error:", error.code);
             }
         }
     });
-
 
     // REGISTRATION
 
@@ -154,7 +143,6 @@
         const email = registerEmail.value.trim();
         const password = registerPassword.value;
         const username = registerUsername.value.trim();
-        const usernameLower = username.toLowerCase();
 
         // VALIDATE PASSWORDS
 
@@ -167,42 +155,23 @@
         registerMessage.textContent = "Creating account...";
 
         try {
-            // CREATE AUTHENTICATION ACCOUNT
-
-            const credential = await createUserWithEmailAndPassword(
-                auth,
-                email,
-                password
-            );
-
-            const user = credential.user;
-
-
-            // CREATE FIRESTORE DOCUMENT
-
-            await setDoc(doc(db, "users", user.uid), {
-                createdAt: serverTimestamp(),
-                email: user.email,
-                uid: user.uid,
-                username: username,
-                usernameLower: usernameLower,
-            });
+            await register(email, password, username);
 
             window.location.href = "/";
-
         } catch (error: unknown) {
-            registerMessage.textContent = "Account creation failed. Please try again.";
+            registerMessage.textContent =
+                "Account creation failed. Please try again.";
 
             if (error instanceof FirebaseError) {
-
                 if (error.code === "auth/email-already-in-use") {
-                    registerMessage.textContent = "This email is already registered.";
-
+                    registerMessage.textContent =
+                        "This email is already registered.";
                 } else if (error.code === "auth/weak-password") {
-                    registerMessage.textContent = "Choose a stronger password.";
-
+                    registerMessage.textContent =
+                        "Choose a stronger password.";
                 } else if (error.code === "permission-denied") {
-                    registerMessage.textContent = "Firestore permission denied. Check your security rules.";
+                    registerMessage.textContent =
+                        "Firestore permission denied. Check your security rules.";
                 }
 
                 console.error("Registration error:", error.code);

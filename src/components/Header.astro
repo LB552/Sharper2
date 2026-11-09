@@ -1,0 +1,173 @@
+<header class="site-header">
+    <a href="/" class="site-logo">
+        Sharper
+    </a>
+
+    <nav class="header-nav" aria-label="Account">
+        <a
+            href="/login"
+            id="login-button"
+            class="auth-button"
+            hidden
+        >
+            Log in
+        </a>
+
+        <button
+            type="button"
+            id="logout-button"
+            class="auth-button"
+            hidden
+        >
+            Log out
+        </button>
+    </nav>
+</header>
+
+<p id="logout-message" role="alert" hidden></p>
+
+<script>
+    import { onAuthStateChanged } from "firebase/auth";
+    import { auth } from "../firebase.js";
+    import { logout } from "../utils/authHandler.js";
+
+    const loginButton = document.querySelector<HTMLAnchorElement>(
+        "#login-button"
+    );
+
+    const logoutButton = document.querySelector<HTMLButtonElement>(
+        "#logout-button"
+    );
+
+    const logoutMessage = document.querySelector<HTMLParagraphElement>(
+        "#logout-message"
+    );
+
+    // Update buttons based on authentication status.
+    onAuthStateChanged(auth, (user) => {
+        if (loginButton) {
+            loginButton.hidden = !!user;
+        }
+
+        if (logoutButton) {
+            logoutButton.hidden = !user;
+        }
+    });
+
+    // Handle logout.
+    logoutButton?.addEventListener("click", async () => {
+        logoutButton.disabled = true;
+
+        if (logoutMessage) {
+            logoutMessage.hidden = true;
+            logoutMessage.textContent = "";
+        }
+
+        try {
+            await logout();
+
+            window.location.href = "/";
+        } catch (error) {
+            console.error("Logout error:", error);
+
+            if (logoutMessage) {
+                logoutMessage.textContent =
+                    "Could not log out. Please try again.";
+                logoutMessage.hidden = false;
+            }
+
+            logoutButton.disabled = false;
+        }
+    });
+</script>
+
+<style>
+    .site-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        width: 100%;
+        padding: 1rem;
+        background-color: var(--theme-color);
+    }
+
+    .site-logo {
+        color: white;
+        font-size: 1.5rem;
+        font-weight: bold;
+        text-decoration: none;
+    }
+
+    .header-nav {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .auth-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 40px;
+        padding: 0.5rem 1rem;
+        border: 2px solid white;
+        border-radius: 8px;
+        background-color: transparent;
+        color: white;
+        font: inherit;
+        font-size: 0.875rem;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+        transition:
+            background-color 0.2s ease,
+            color 0.2s ease;
+    }
+
+    .auth-button:hover {
+        background-color: white;
+        color: var(--theme-color);
+    }
+
+    .auth-button:focus-visible {
+        outline: 3px solid white;
+        outline-offset: 3px;
+    }
+
+    .auth-button:disabled {
+        opacity: 0.6;
+        cursor: wait;
+    }
+
+    .auth-button[hidden] {
+        display: none;
+    }
+
+    #logout-message {
+        margin: 0;
+        padding: 0.75rem 1rem;
+        color: #b91c1c;
+        text-align: center;
+    }
+
+    #logout-message[hidden] {
+        display: none;
+    }
+
+    @media (min-width: 600px) {
+        .site-header {
+            padding: 1rem 2rem;
+        }
+
+        .auth-button {
+            font-size: 1rem;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .auth-button {
+            transition: none;
+        }
+    }
+</style>
