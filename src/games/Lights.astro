@@ -1,8 +1,8 @@
 ---
-const { gameTitle = "Lights", gameType, gameSlug } = Astro.props;
+const { gameTitle = "Lights", gameType, gameSlug, unlockRequirement = 0 } = Astro.props;
 ---
 
-<div id="game-board" data-game-type={gameType} data-game-slug={gameSlug} hidden></div>
+<div id="game-board" data-game-title={gameTitle} data-game-type={gameType} data-game-slug={gameSlug} data-unlock-requirement={unlockRequirement} hidden></div>
 <div id="locked-game" hidden>
     <h2>Unlock {gameTitle}</h2>
     <p>Create a free account to play {gameTitle} and all other Sharper games.</p>
@@ -22,6 +22,7 @@ const { gameTitle = "Lights", gameType, gameSlug } = Astro.props;
     import { waitForAuth, loadDifficulty, saveDifficulty } from "../utils/gameProgress";
     import { isGameLocked } from "../utils/demoMode.js";
     import { createDailyTimer, formatRemaining } from "../utils/dailyTimer.js";
+    import { loadDaysPlayed, completeTrainingDay, isUnlocked } from "../utils/daysPlayed.js";
 
     const gameBoard = document.querySelector<HTMLDivElement>("#game-board")!;
     const status = document.querySelector<HTMLParagraphElement>("#game-status")!;
@@ -31,6 +32,7 @@ const { gameTitle = "Lights", gameType, gameSlug } = Astro.props;
     const dailyLimitMessage = document.querySelector<HTMLDivElement>("#daily-limit-message")!;
     const gameType = gameBoard.dataset.gameType ?? "";
     const gameSlug = gameBoard.dataset.gameSlug ?? "";
+    const unlockRequirement = Number(gameBoard.dataset.unlockRequirement ?? 0);
 
     const lightCount = 6;
     const roundsPerSession = 2;
@@ -45,6 +47,10 @@ const { gameTitle = "Lights", gameType, gameSlug } = Astro.props;
     let difficulty = DEFAULT_DIFFICULTY;
     let dailyTimer: ReturnType<typeof createDailyTimer> | null = null;
     let dailyLocked = false;
+    let sessionWindow: { date: string; startedAt: number; expiresAt: number } | null = null;
+    let progressSaved = false;
+    let sessionStartedAt: number | null = null;
+    let sessionCompletedAt: number | null = null;
     let sequence: number[] = [];
     let playerSequence: number[] = [];
     let wins = 0;
@@ -113,6 +119,7 @@ const { gameTitle = "Lights", gameType, gameSlug } = Astro.props;
 
         if (currentRound === roundsPerSession) {
             gameFinished = true;
+            sessionCompletedAt = Date.now();
             pendingResult = { wins, losses };
             void finishGame();
         } else {
@@ -129,16 +136,24 @@ const { gameTitle = "Lights", gameType, gameSlug } = Astro.props;
         status.textContent = "Saving progress...";
 
         try {
-            await saveDifficulty(gameSlug, levelResult.difficulty, user);
+            if (!progressSaved) {
+                await saveDifficulty(gameSlug, levelResult.difficulty, user);
+                difficulty = levelResult.difficulty;
+                progressSaved = true;
+            }
+            // The timer reaching 0:00 alone never awards credit.
+            // Use the actual gameplay completion time, not save/retry time.
+            if (user && sessionWindow && sessionStartedAt !== null && sessionCompletedAt !== null) {
+                await completeTrainingDay(user, sessionWindow, sessionStartedAt, sessionCompletedAt);
+            }
         } catch (error) {
-            console.error("Could not save Lights progress:", error);
-            status.textContent = "Could not save progress. Retry to continue.";
+            console.error("Could not finalize Lights session:", error);
+            status.textContent = "Could not save training progress. Retry to continue.";
             retryButton.hidden = false;
             saving = false;
             return;
         }
 
-        difficulty = levelResult.difficulty;
         pendingResult = null;
         status.textContent = `Session complete. Difficulty: ${difficulty}.`;
         await sleep(sessionDelay);
@@ -167,6 +182,7 @@ const { gameTitle = "Lights", gameType, gameSlug } = Astro.props;
             showDailyLimit();
             return;
         }
+        sessionWindow = dailyTimer.getWindow();
         dailyLocked = false;
         gameBoard.hidden = false;
         dailyLimitMessage.hidden = true;
@@ -180,6 +196,9 @@ const { gameTitle = "Lights", gameType, gameSlug } = Astro.props;
     }
 
     function startGame() {
+        sessionStartedAt = Date.now();
+        sessionCompletedAt = null;
+        progressSaved = false;
         wins = 0;
         losses = 0;
         currentRound = 0;
@@ -208,6 +227,20 @@ const { gameTitle = "Lights", gameType, gameSlug } = Astro.props;
                 lockedGame.hidden = false;
                 status.textContent = "";
                 return;
+            }
+            if (user) {
+                const daysPlayed = await loadDaysPlayed(user);
+                if (!isUnlocked(daysPlayed, unlockRequirement)) {
+                    gameLocked = true;
+                    gameBoard.hidden = true;
+                    lockedGame.hidden = false;
+                    lockedGame.querySelector("h2")!.textContent = `Unlock ${gameBoard.dataset.gameTitle ?? "this game"}`;
+                    lockedGame.querySelector("p")!.textContent =
+                        `Train on ${unlockRequirement} different days to unlock this game. Your progress: ${daysPlayed}.`;
+                    lockedGame.querySelector("a")!.hidden = true;
+                    status.textContent = "";
+                    return;
+                }
             }
             dailyTimer?.stop();
             dailyTimer = createDailyTimer({

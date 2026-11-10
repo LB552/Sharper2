@@ -58,5 +58,12 @@ export default defineType({
       title: 'Game Description',
       type: 'text',
     }),
+
+    defineField({
+      name: 'unlockRequirement',
+      title: 'Unlock requirement',
+      type: 'number',
+      validation: (Rule) => Rule.integer().min(0),
+    })
   ],
 });

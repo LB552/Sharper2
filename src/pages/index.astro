@@ -7,7 +7,8 @@ const games = await sanityClient.fetch(`
         title,
         subheading,
         "slug": slug.current,
-        "thumbnailUrl": thumbnail.asset->url
+        "thumbnailUrl": thumbnail.asset->url,
+        unlockRequirement
     }
 `);
 ---
@@ -20,6 +21,7 @@ const games = await sanityClient.fetch(`
             <a
                 class="game-card"
                 data-game-slug={game.slug}
+                data-unlock-requirement={game.unlockRequirement ?? 0}
                 data-game-href={`/${game.slug}`}
                 data-thumbnail-url={game.thumbnailUrl ?? ""}
             >
@@ -46,6 +48,7 @@ const games = await sanityClient.fetch(`
 <script>
     import { waitForAuth, loadDifficulty } from "../utils/gameProgress.js";
     import { isGameLocked } from "../utils/demoMode.js";
+    import { loadDaysPlayed, isUnlocked } from "../utils/daysPlayed.js";
 
     async function initializeCards() {
         const grid = document.querySelector<HTMLElement>("#game-grid")!;
@@ -53,6 +56,7 @@ const games = await sanityClient.fetch(`
 
         try {
             const user = await waitForAuth();
+            const daysPlayed = user ? await loadDaysPlayed(user) : 0;
 
             await Promise.all(cards.map(async (card) => {
                 const slug = card.dataset.gameSlug ?? "";
@@ -60,14 +64,20 @@ const games = await sanityClient.fetch(`
                 const difficultyLabel = card.querySelector<HTMLElement>(".game-difficulty")!;
                 const requirement = card.querySelector<HTMLElement>(".unlock-requirement")!;
 
-                if (isGameLocked(slug, user)) {
+                const threshold = Number(card.dataset.unlockRequirement ?? 0);
+                const guestLocked = isGameLocked(slug, user);
+                const daysLocked = !guestLocked && !!user && !isUnlocked(daysPlayed, threshold);
+
+                if (guestLocked || daysLocked) {
                     card.removeAttribute("href");
                     card.setAttribute("aria-disabled", "true");
                     card.classList.add("is-locked");
                     image.src = "/lock.png";
                     image.alt = `${slug} is locked`;
                     difficultyLabel.hidden = true;
-                    requirement.textContent = "Create an account to unlock";
+                    requirement.textContent = guestLocked
+                        ? "Create an account to unlock"
+                        : `Unlock after ${threshold} training days (${daysPlayed}/${threshold})`;
                     requirement.hidden = false;
                     return;
                 }

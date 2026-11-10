@@ -114,6 +114,10 @@ export function createDailyTimer({ gameSlug, user, onTick, onNewDay, onError }) 
     }
 
     return {
+        getWindow() {
+            return windowData ? { ...windowData } : null;
+        },
+        
         async start() {
             await refresh();
             if (!disposed) intervalId = setInterval(tick, 250);

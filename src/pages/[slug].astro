@@ -11,7 +11,8 @@ export async function getStaticPaths() {
             "slug": slug.current,
             title,
             description,
-            gameType
+            gameType,
+            unlockRequirement
         }
     `);
 
@@ -32,15 +33,9 @@ const GameComponent = {
     <h1>{game.title}</h1>
     <p>{game.description}</p>
 
-  <section class="game-window">
-      {GameComponent && (
-          <GameComponent
-              gameTitle={game.title}
-              gameType={game.gameType}
-              gameSlug={game.slug}
-          />
-      )}
-  </section>
+    <section class="game-window">
+        {GameComponent && <GameComponent gameTitle={game.title} gameType={game.gameType} gameSlug={game.slug} unlockRequirement={game.unlockRequirement ?? 0} />}
+    </section>
 </Layout>
 
 <style>
