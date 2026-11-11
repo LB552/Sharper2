@@ -30,25 +30,7 @@
         </div>
 
         <div class="stats-content">
-            <section class="stats-section">
-                <h3>Overview</h3>
-                <div class="stats-placeholder"></div>
-            </section>
-
-            <section class="stats-section">
-                <h3>Training Activity</h3>
-                <div class="stats-placeholder"></div>
-            </section>
-
-            <section class="stats-section">
-                <h3>Game Progress</h3>
-                <div class="stats-placeholder"></div>
-            </section>
-
-            <section class="stats-section">
-                <h3>Achievements</h3>
-                <div class="stats-placeholder"></div>
-            </section>
+            <p>Days played: <span id="stats-days-played">0</span></p>
         </div>
 
         <!-- FOOTER -->
@@ -62,9 +44,14 @@
 
 <script>
     import { onAuthStateChanged } from "firebase/auth";
-    import { auth } from "../firebase.js";
+    import { auth, db } from "../firebase.js";
+    import { doc, getDoc } from "firebase/firestore";
 
     // ELEMENTS
+
+    const daysPlayedElement = document.querySelector<HTMLSpanElement>(
+        "#stats-days-played"
+    );
 
     const dashboard = document.querySelector<HTMLDivElement>(
         "#stats-dashboard"
@@ -91,9 +78,41 @@
 
     // AUTHENTICATION
 
-    onAuthStateChanged(auth, (user) => {
+    onAuthStateChanged(auth, async (user) => {
         if (!user) {
             closeDashboard();
+
+            if (daysPlayedElement) {
+                daysPlayedElement.textContent = "0";
+            }
+
+            return;
+        }
+
+        try {
+            const snapshot = await getDoc(
+                doc(db, "gameSaves", user.uid)
+            );
+
+            // Ignore results if the signed-in user has changed.
+            if (auth.currentUser?.uid !== user.uid) return;
+
+            const daysPlayed = snapshot.exists()
+                ? snapshot.data().daysPlayed ?? 0
+                : 0;
+
+            if (daysPlayedElement) {
+                daysPlayedElement.textContent = String(daysPlayed);
+            }
+        } catch (error) {
+            console.error("Could not load days played:", error);
+
+            if (
+                daysPlayedElement &&
+                auth.currentUser?.uid === user.uid
+            ) {
+                daysPlayedElement.textContent = "Unavailable";
+            }
         }
     });
 
