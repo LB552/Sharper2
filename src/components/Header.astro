@@ -1,10 +1,12 @@
 <header class="site-header">
     <div class="header-user">
-        <a
-            href="/profile"
+        <button
+            type="button"
             id="user-info"
             class="user-info"
-            aria-label="View your profile"
+            aria-label="Open your stats"
+            aria-controls="stats-panel"
+            aria-expanded="false"
             hidden
         >
             <svg
@@ -23,7 +25,7 @@
             </svg>
 
             <span id="username"></span>
-        </a>
+        </button>
     </div>
 
     <a href="/" class="site-logo">
@@ -71,13 +73,17 @@
         "#logout-message"
     );
 
-    const userInfo = document.querySelector<HTMLAnchorElement>(
+    const userInfo = document.querySelector<HTMLButtonElement>(
         "#user-info"
     );
 
     const usernameElement = document.querySelector<HTMLSpanElement>(
         "#username"
     );
+
+    userInfo?.addEventListener("click", () => {
+        document.dispatchEvent(new Event("sharper:open-stats"));
+    });
 
     // Update buttons and username based on authentication status.
     onAuthStateChanged(auth, async (user) => {
@@ -181,8 +187,14 @@
         align-items: center;
         gap: 0.5rem;
         min-width: 0;
+
+        padding: 0;
+        border: none;
+        background: transparent;
+
         color: white;
-        text-decoration: none;
+        font: inherit;
+        text-align: left;
         cursor: pointer;
     }
 

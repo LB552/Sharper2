@@ -1,0 +1,383 @@
+<div class="stats-dashboard" id="stats-dashboard">
+    <!-- BACKDROP -->
+    <div
+        id="stats-backdrop"
+        class="stats-backdrop"
+        aria-hidden="true"
+    ></div>
+
+    <!-- DASHBOARD PANEL -->
+    <aside
+        id="stats-panel"
+        class="stats-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="stats-title"
+        aria-hidden="true"
+        inert
+    >
+        <div class="stats-header">
+            <h2 id="stats-title">Your Stats</h2>
+
+            <button
+                type="button"
+                id="stats-close"
+                class="stats-close"
+                aria-label="Close dashboard"
+            >
+                &times;
+            </button>
+        </div>
+
+        <div class="stats-content">
+            <section class="stats-section">
+                <h3>Overview</h3>
+                <div class="stats-placeholder"></div>
+            </section>
+
+            <section class="stats-section">
+                <h3>Training Activity</h3>
+                <div class="stats-placeholder"></div>
+            </section>
+
+            <section class="stats-section">
+                <h3>Game Progress</h3>
+                <div class="stats-placeholder"></div>
+            </section>
+
+            <section class="stats-section">
+                <h3>Achievements</h3>
+                <div class="stats-placeholder"></div>
+            </section>
+        </div>
+
+        <!-- FOOTER -->
+        <footer class="stats-footer">
+            <a href="/profile" class="profile-link">
+                Edit profile
+            </a>
+        </footer>
+    </aside>
+</div>
+
+<script>
+    import { onAuthStateChanged } from "firebase/auth";
+    import { auth } from "../firebase.js";
+
+    // ELEMENTS
+
+    const dashboard = document.querySelector<HTMLDivElement>(
+        "#stats-dashboard"
+    );
+
+    const closeButton = document.querySelector<HTMLButtonElement>(
+        "#stats-close"
+    );
+
+    const backdrop = document.querySelector<HTMLDivElement>(
+        "#stats-backdrop"
+    );
+
+    const panel = document.querySelector<HTMLElement>(
+        "#stats-panel"
+    );
+
+    const userInfo = document.querySelector<HTMLButtonElement>(
+        "#user-info"
+    );
+
+    let previousFocus: HTMLElement | null = null;
+    let previousBodyOverflow = "";
+
+    // AUTHENTICATION
+
+    onAuthStateChanged(auth, (user) => {
+        if (!user) {
+            closeDashboard();
+        }
+    });
+
+    // OPEN
+
+    function openDashboard() {
+        if (
+            !auth.currentUser ||
+            !dashboard ||
+            !panel ||
+            dashboard.classList.contains("is-open")
+        ) return;
+
+        previousFocus = document.activeElement as HTMLElement;
+        previousBodyOverflow = document.body.style.overflow;
+
+        dashboard.classList.add("is-open");
+
+        panel.inert = false;
+        panel.setAttribute("aria-hidden", "false");
+        userInfo?.setAttribute("aria-expanded", "true");
+
+        document.body.style.overflow = "hidden";
+
+        closeButton?.focus();
+    }
+
+    // CLOSE
+
+    function closeDashboard() {
+        if (!dashboard || !panel) return;
+
+        const wasOpen = dashboard.classList.contains("is-open");
+
+        dashboard.classList.remove("is-open");
+
+        if (wasOpen && panel.contains(document.activeElement)) {
+            previousFocus?.focus();
+        }
+
+        panel.inert = true;
+        panel.setAttribute("aria-hidden", "true");
+        userInfo?.setAttribute("aria-expanded", "false");
+
+        if (wasOpen) {
+            document.body.style.overflow = previousBodyOverflow;
+        }
+    }
+
+    // HEADER EVENT
+
+    document.addEventListener(
+        "sharper:open-stats",
+        openDashboard
+    );
+
+    // CLOSE EVENTS
+
+    closeButton?.addEventListener("click", closeDashboard);
+
+    backdrop?.addEventListener("click", closeDashboard);
+
+    // KEYBOARD SUPPORT
+
+    document.addEventListener("keydown", (event) => {
+        if (!dashboard?.classList.contains("is-open") || !panel) {
+            return;
+        }
+
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closeDashboard();
+            return;
+        }
+
+        if (event.key !== "Tab") return;
+
+        const focusable = Array.from(
+            panel.querySelectorAll<HTMLElement>(
+                'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            )
+        ).filter((element) => !element.hidden);
+
+        if (focusable.length === 0) {
+            event.preventDefault();
+            return;
+        }
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (
+            !event.shiftKey &&
+            document.activeElement === last
+        ) {
+            event.preventDefault();
+            first.focus();
+        }
+    });
+</script>
+
+<style>
+    /* BACKDROP */
+
+    .stats-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 999;
+
+        background-color: rgba(0, 0, 0, 0.45);
+
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+
+        transition:
+            opacity 0.25s ease,
+            visibility 0.25s ease;
+    }
+
+    .is-open .stats-backdrop {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+    }
+
+    /* SIDEBAR */
+
+    .stats-panel {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 1000;
+
+        width: 340px;
+        max-width: 100%;
+
+        display: flex;
+        flex-direction: column;
+
+        background-color: white;
+        color: #222;
+
+        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+
+        transform: translateX(-100%);
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+
+        transition:
+            transform 0.25s ease,
+            opacity 0.25s ease,
+            visibility 0.25s ease;
+    }
+
+    .is-open .stats-panel {
+        transform: translateX(0);
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+    }
+
+    /* HEADER */
+
+    .stats-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+
+        padding: 1rem;
+        border-bottom: 1px solid #ddd;
+    }
+
+    .stats-header h2 {
+        margin: 0;
+        font-size: 1.5rem;
+    }
+
+    .stats-close {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        width: 40px;
+        height: 40px;
+
+        border: none;
+        border-radius: 8px;
+        background: transparent;
+        color: inherit;
+
+        font-size: 2rem;
+        cursor: pointer;
+    }
+
+    .stats-close:hover {
+        background-color: #f0f0f0;
+    }
+
+    .stats-close:focus-visible,
+    .profile-link:focus-visible {
+        outline: 3px solid var(--theme-color);
+        outline-offset: 3px;
+    }
+
+    /* CONTENT */
+
+    .stats-content {
+        flex: 1;
+        min-height: 0;
+
+        padding: 1rem;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    .stats-section {
+        margin-bottom: 1.5rem;
+    }
+
+    .stats-section h3 {
+        margin: 0 0 0.75rem;
+        font-size: 1rem;
+    }
+
+    .stats-placeholder {
+        min-height: 100px;
+        border: 2px dashed #ddd;
+        border-radius: 8px;
+        background-color: #fafafa;
+    }
+
+    /* FOOTER */
+
+    .stats-footer {
+        padding: 1rem;
+        border-top: 1px solid #ddd;
+        text-align: center;
+    }
+
+    .profile-link {
+        color: #666;
+        font-size: 0.875rem;
+        text-decoration: none;
+    }
+
+    .profile-link:hover {
+        color: var(--theme-color);
+        text-decoration: underline;
+    }
+
+    /* MOBILE */
+
+    @media (max-width: 600px) {
+        .stats-panel {
+            width: 100%;
+            height: 100dvh;
+            bottom: auto;
+
+            transform: translateX(-20px);
+        }
+
+        .is-open .stats-panel {
+            transform: translateX(0);
+        }
+
+        .stats-header,
+        .stats-content {
+            padding: 1.25rem;
+        }
+    }
+
+    /* REDUCED MOTION */
+
+    @media (prefers-reduced-motion: reduce) {
+        .stats-backdrop,
+        .stats-panel {
+            transition: none;
+        }
+    }
+</style>
