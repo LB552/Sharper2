@@ -1,309 +1,123 @@
 ---
+import GameShell from "../components/GameShell.astro";
 const { gameTitle = "Lights", gameType, gameSlug, unlockRequirement = 0 } = Astro.props;
 ---
 
-<div id="game-board" data-game-title={gameTitle} data-game-type={gameType} data-game-slug={gameSlug} data-unlock-requirement={unlockRequirement} hidden></div>
-<div id="locked-game" hidden>
-    <h2>Unlock {gameTitle}</h2>
-    <p>Create a free account to play {gameTitle} and all other Sharper games.</p>
-    <a href="/login">Create an account</a>
-</div>
-<p id="daily-timer" role="timer" hidden>Daily time: --:--</p>
-<p id="game-status" role="status" aria-live="polite"></p>
-<div id="daily-limit-message" hidden>
-    <h2>Daily time complete</h2>
-    <p>Come back tomorrow for another five minutes of {gameTitle}.</p>
-    <a href="/">Back to games</a>
-</div>
-<button id="retry-button" type="button" hidden>Retry</button>
+<GameShell {gameTitle} {gameType} {gameSlug} {unlockRequirement} />
 
 <script>
-    import { DEFAULT_DIFFICULTY, handleLevel } from "../utils/levelHandler";
-    import { waitForAuth, loadDifficulty, saveDifficulty } from "../utils/gameProgress";
-    import { isGameLocked } from "../utils/demoMode.js";
-    import { createDailyTimer, formatRemaining } from "../utils/dailyTimer.js";
-    import { loadDaysPlayed, completeTrainingDay, isUnlocked } from "../utils/daysPlayed.js";
+    import { mountGame } from "../utils/gameController.js";
 
-    const gameBoard = document.querySelector<HTMLDivElement>("#game-board")!;
-    const status = document.querySelector<HTMLParagraphElement>("#game-status")!;
-    const lockedGame = document.querySelector<HTMLDivElement>("#locked-game")!;
-    const retryButton = document.querySelector<HTMLButtonElement>("#retry-button")!;
-    const dailyTimerLabel = document.querySelector<HTMLParagraphElement>("#daily-timer")!;
-    const dailyLimitMessage = document.querySelector<HTMLDivElement>("#daily-limit-message")!;
-    const gameType = gameBoard.dataset.gameType ?? "";
-    const gameSlug = gameBoard.dataset.gameSlug ?? "";
-    const unlockRequirement = Number(gameBoard.dataset.unlockRequirement ?? 0);
+    mountGame(document.querySelector<HTMLElement>("#game-shell"), {
+        startSession({ board, difficulty, complete }) {
+            const LIGHT_COUNT = 6;
+            const ROUNDS_PER_SESSION = 2;
+            const INITIAL_DELAY = 250;
+            const FLASH_DURATION = 500;
+            const FLASH_DELAY = 250;
+            const CLICK_DURATION = 200;
+            const ROUND_DELAY = 1000;
 
-    const lightCount = 6;
-    const roundsPerSession = 2;
-    const initialDelay = 250;
-    const flashDuration = 500;
-    const flashDelay = 250;
-    const clickDuration = 200;
-    const roundDelay = 1000;
-    const sessionDelay = 1000;
+            let active = true;
+            let inputLocked = true;
+            let sequence: number[] = [];
+            let playerSequence: number[] = [];
+            let wins = 0;
+            let losses = 0;
+            let currentRound = 0;
+            const timeouts = new Set<ReturnType<typeof setTimeout>>();
 
-    let user: Awaited<ReturnType<typeof waitForAuth>> = null;
-    let difficulty = DEFAULT_DIFFICULTY;
-    let dailyTimer: ReturnType<typeof createDailyTimer> | null = null;
-    let dailyLocked = false;
-    let sessionWindow: { date: string; startedAt: number; expiresAt: number } | null = null;
-    let progressSaved = false;
-    let sessionStartedAt: number | null = null;
-    let sessionCompletedAt: number | null = null;
-    let sequence: number[] = [];
-    let playerSequence: number[] = [];
-    let wins = 0;
-    let losses = 0;
-    let currentRound = 0;
-    let gameLocked = true;
-    let gameFinished = false;
-    let saving = false;
-    let pendingResult: { wins: number; losses: number } | null = null;
-
-    const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-    function generateSequence() {
-        sequence = [];
-        const flashAmount = 5 + difficulty;
-        for (let i = 0; i < flashAmount; i++) {
-            sequence.push(Math.floor(Math.random() * lightCount));
-        }
-    }
-
-    function renderLights() {
-        gameBoard.innerHTML = "";
-        for (let i = 0; i < lightCount; i++) {
-            const light = document.createElement("div");
-            light.classList.add("light");
-            light.addEventListener("click", () => clickLight(i, light));
-            gameBoard.appendChild(light);
-        }
-    }
-
-    async function flashSequence() {
-        gameLocked = true;
-        const lights = gameBoard.querySelectorAll<HTMLDivElement>(".light");
-        await sleep(initialDelay);
-
-        for (const index of sequence) {
-            lights[index].classList.add("active");
-            await sleep(flashDuration);
-            lights[index].classList.remove("active");
-            await sleep(flashDelay);
-        }
-
-        gameLocked = false;
-    }
-
-    function clickLight(index: number, light: HTMLDivElement) {
-        if (gameLocked || gameFinished) return;
-
-        playerSequence.push(index);
-        light.classList.add("active");
-        setTimeout(() => light.classList.remove("active"), clickDuration);
-
-        const currentIndex = playerSequence.length - 1;
-        if (sequence[currentIndex] !== index) {
-            finishRound(false);
-        } else if (playerSequence.length === sequence.length) {
-            finishRound(true);
-        }
-    }
-
-    function finishRound(won: boolean) {
-        gameLocked = true;
-        if (won) wins++;
-        else losses++;
-        currentRound++;
-
-        if (currentRound === roundsPerSession) {
-            gameFinished = true;
-            sessionCompletedAt = Date.now();
-            pendingResult = { wins, losses };
-            void finishGame();
-        } else {
-            setTimeout(startRound, roundDelay);
-        }
-    }
-
-    async function finishGame() {
-        if (!pendingResult || saving) return;
-        saving = true;
-        retryButton.hidden = true;
-
-        const levelResult = handleLevel(gameType, difficulty, pendingResult);
-        status.textContent = "Saving progress...";
-
-        try {
-            if (!progressSaved) {
-                await saveDifficulty(gameSlug, levelResult.difficulty, user);
-                difficulty = levelResult.difficulty;
-                progressSaved = true;
+            function schedule(callback: () => void, ms: number) {
+                const id = setTimeout(() => {
+                    timeouts.delete(id);
+                    if (active) callback();
+                }, ms);
+                timeouts.add(id);
             }
-            // The timer reaching 0:00 alone never awards credit.
-            // Use the actual gameplay completion time, not save/retry time.
-            if (user && sessionWindow && sessionStartedAt !== null && sessionCompletedAt !== null) {
-                await completeTrainingDay(user, sessionWindow, sessionStartedAt, sessionCompletedAt);
+
+            function delay(ms: number) {
+                return new Promise<void>((resolve) => schedule(resolve, ms));
             }
-        } catch (error) {
-            console.error("Could not finalize Lights session:", error);
-            status.textContent = "Could not save training progress. Retry to continue.";
-            retryButton.hidden = false;
-            saving = false;
-            return;
-        }
 
-        pendingResult = null;
-        status.textContent = `Session complete. Difficulty: ${difficulty}.`;
-        await sleep(sessionDelay);
-        saving = false;
-        try {
-            await startNextSession();
-        } catch (error) {
-            reportTimerError(error);
-            retryButton.hidden = false;
-        }
-    }
-
-    function showDailyLimit() {
-        dailyLocked = true;
-        gameFinished = true;
-        gameLocked = true;
-        gameBoard.hidden = true;
-        dailyLimitMessage.hidden = false;
-        retryButton.hidden = true;
-        status.textContent = "Today's five minutes are complete.";
-    }
-
-    async function startNextSession() {
-        // Only deny a new session, never an already-running round/session.
-        if (!dailyTimer || !(await dailyTimer.canStartSession())) {
-            showDailyLimit();
-            return;
-        }
-        sessionWindow = dailyTimer.getWindow();
-        dailyLocked = false;
-        gameBoard.hidden = false;
-        dailyLimitMessage.hidden = true;
-        startGame();
-    }
-
-    function startRound() {
-        playerSequence = [];
-        generateSequence();
-        void flashSequence();
-    }
-
-    function startGame() {
-        sessionStartedAt = Date.now();
-        sessionCompletedAt = null;
-        progressSaved = false;
-        wins = 0;
-        losses = 0;
-        currentRound = 0;
-        gameFinished = false;
-        gameLocked = true;
-        pendingResult = null;
-        status.textContent = "";
-        retryButton.hidden = true;
-        renderLights();
-        startRound();
-    }
-
-    function reportTimerError(error: unknown) {
-        console.error("Daily timer error:", error);
-        status.textContent = "Could not load daily playtime. Please retry.";
-    }
-
-    async function initializeGame() {
-        retryButton.hidden = true;
-        status.textContent = "Loading progress...";
-        try {
-            user = await waitForAuth();
-            if (isGameLocked(gameSlug, user)) {
-                gameLocked = true;
-                gameBoard.hidden = true;
-                lockedGame.hidden = false;
-                status.textContent = "";
-                return;
-            }
-            if (user) {
-                const daysPlayed = await loadDaysPlayed(user);
-                if (!isUnlocked(daysPlayed, unlockRequirement)) {
-                    gameLocked = true;
-                    gameBoard.hidden = true;
-                    lockedGame.hidden = false;
-                    lockedGame.querySelector("h2")!.textContent = `Unlock ${gameBoard.dataset.gameTitle ?? "this game"}`;
-                    lockedGame.querySelector("p")!.textContent =
-                        `Train on ${unlockRequirement} different days to unlock this game. Your progress: ${daysPlayed}.`;
-                    lockedGame.querySelector("a")!.hidden = true;
-                    status.textContent = "";
-                    return;
+            function generateSequence() {
+                sequence = [];
+                for (let i = 0; i < 5 + difficulty; i++) {
+                    sequence.push(Math.floor(Math.random() * LIGHT_COUNT));
                 }
             }
-            dailyTimer?.stop();
-            dailyTimer = createDailyTimer({
-                gameSlug,
-                user,
-                onTick: (remaining) => {
-                    dailyTimerLabel.textContent = `Daily time: ${formatRemaining(remaining)}`;
-                },
-                onNewDay: () => {
-                    if (dailyLocked) void startNextSession().catch(reportTimerError);
-                },
-                onError: reportTimerError,
-            });
-            await dailyTimer.start();
-            difficulty = await loadDifficulty(gameSlug, user);
-            lockedGame.hidden = true;
-            dailyTimerLabel.hidden = false;
-            await startNextSession();
-        } catch (error) {
-            console.error("Could not load Lights progress:", error);
-            status.textContent = "Could not load progress. Retry to play.";
-            retryButton.hidden = false;
-        }
-    }
 
-    retryButton.addEventListener("click", () => {
-        if (pendingResult) void finishGame();
-        else void initializeGame();
+            async function flashSequence() {
+                inputLocked = true;
+                const lights = board.querySelectorAll<HTMLDivElement>(".light");
+                await delay(INITIAL_DELAY);
+                if (!active) return;
+                for (const index of sequence) {
+                    lights[index].classList.add("active");
+                    await delay(FLASH_DURATION);
+                    if (!active) return;
+                    lights[index].classList.remove("active");
+                    await delay(FLASH_DELAY);
+                    if (!active) return;
+                }
+                inputLocked = false;
+            }
+
+            function startRound() {
+                if (!active) return;
+                playerSequence = [];
+                generateSequence();
+                void flashSequence();
+            }
+
+            function finishRound(won: boolean) {
+                inputLocked = true;
+                if (won) wins++;
+                else losses++;
+                currentRound++;
+                if (currentRound === ROUNDS_PER_SESSION) {
+                    active = false;
+                    complete({ wins, losses });
+                } else {
+                    schedule(startRound, ROUND_DELAY);
+                }
+            }
+
+            function clickLight(index: number, light: HTMLDivElement) {
+                if (!active || inputLocked) return;
+                playerSequence.push(index);
+                light.classList.add("active");
+                schedule(() => light.classList.remove("active"), CLICK_DURATION);
+                const position = playerSequence.length - 1;
+                if (sequence[position] !== index) finishRound(false);
+                else if (playerSequence.length === sequence.length) finishRound(true);
+            }
+
+            board.innerHTML = "";
+            for (let i = 0; i < LIGHT_COUNT; i++) {
+                const light = document.createElement("div");
+                light.classList.add("light");
+                light.addEventListener("click", () => clickLight(i, light));
+                board.appendChild(light);
+            }
+            startRound();
+
+            return () => {
+                active = false;
+                for (const id of timeouts) clearTimeout(id);
+                timeouts.clear();
+            };
+        },
     });
-
-    window.addEventListener("pagehide", () => dailyTimer?.stop());
-    void initializeGame();
 </script>
 
 <style>
-    #game-board {
+    :global(#game-board) {
         display: flex;
         justify-content: center;
         gap: 15px;
         padding: 10px;
     }
-
-    #game-board[hidden],
-    #locked-game[hidden],
-    #daily-timer[hidden],
-    #daily-limit-message[hidden] {
-        display: none;
-    }
-
-    #daily-timer { font-variant-numeric: tabular-nums; font-weight: bold; }
-
-    #daily-limit-message { text-align: center; padding: 1rem; }
-
-    #locked-game {
-        text-align: center;
-    }
-
-    #locked-game a {
-        color: var(--theme-color);
-        font-weight: bold;
-    }
-
-    #game-board :global(.light) {
+    :global(#game-board .light) {
         width: 50px;
         height: 50px;
         border-radius: 50%;
@@ -311,8 +125,5 @@ const { gameTitle = "Lights", gameType, gameSlug, unlockRequirement = 0 } = Astr
         border: 2px solid royalblue;
         cursor: pointer;
     }
-
-    #game-board :global(.light.active) {
-        background-color: royalblue;
-    }
+    :global(#game-board .light.active) { background-color: royalblue; }
 </style>

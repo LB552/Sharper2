@@ -1,352 +1,138 @@
 ---
+import GameShell from "../components/GameShell.astro";
 const { gameTitle = "Memory", gameType, gameSlug, unlockRequirement = 0 } = Astro.props;
 ---
 
-<div id="game-board" data-game-title={gameTitle} data-game-type={gameType} data-game-slug={gameSlug} data-unlock-requirement={unlockRequirement}></div>
-<p id="daily-timer" role="timer">Daily time: --:--</p>
-<p id="game-status" role="status" aria-live="polite"></p>
-<div id="daily-limit-message" hidden>
-    <h2>Daily time complete</h2>
-    <p>Come back tomorrow for another five minutes of {gameTitle}.</p>
-    <a href="/">Back to games</a>
-</div>
-<button id="retry-button" type="button" hidden>Retry</button>
-
-<dialog id="demo-limit-dialog" aria-labelledby="demo-limit-title">
-    <h2 id="demo-limit-title">You've completed the Sharper demo!</h2>
-    <p>Create an account to unlock all games and keep progressing.</p>
-    <div class="demo-actions">
-        <a href="/login">Create an account</a>
-        <a href="/">Back to games</a>
-    </div>
-</dialog>
+<GameShell {gameTitle} {gameType} {gameSlug} {unlockRequirement}>
+    <!-- The demo message is intentionally Memory-specific. -->
+    <dialog id="demo-limit-dialog" aria-labelledby="demo-limit-title">
+        <h2 id="demo-limit-title">You've completed the Sharper demo!</h2>
+        <p>Create an account to unlock all games and keep progressing.</p>
+        <div class="demo-actions">
+            <a href="/login">Create an account</a>
+            <a href="/">Back to games</a>
+        </div>
+    </dialog>
+</GameShell>
 
 <script>
-    import { DEFAULT_DIFFICULTY, handleLevel } from "../utils/levelHandler";
-    import { waitForAuth, loadDifficulty, saveDifficulty } from "../utils/gameProgress";
+    import { mountGame } from "../utils/gameController.js";
     import { hasReachedDemoLimit, recordDemoSession } from "../utils/demoMode.js";
-    import { createDailyTimer, formatRemaining } from "../utils/dailyTimer.js";
-    import { loadDaysPlayed, completeTrainingDay, isUnlocked } from "../utils/daysPlayed.js";
 
-    const gameBoard = document.querySelector<HTMLDivElement>("#game-board")!;
-    const status = document.querySelector<HTMLParagraphElement>("#game-status")!;
-    const retryButton = document.querySelector<HTMLButtonElement>("#retry-button")!;
     const demoDialog = document.querySelector<HTMLDialogElement>("#demo-limit-dialog")!;
-    const dailyTimerLabel = document.querySelector<HTMLParagraphElement>("#daily-timer")!;
-    const dailyLimitMessage = document.querySelector<HTMLDivElement>("#daily-limit-message")!;
-    const gameType = gameBoard.dataset.gameType ?? "";
-    const gameSlug = gameBoard.dataset.gameSlug ?? "";
-    const unlockRequirement = Number(gameBoard.dataset.unlockRequirement ?? 0);
-    const sessionDelay = 1000;
 
-    let user: Awaited<ReturnType<typeof waitForAuth>> = null;
-    let difficulty = DEFAULT_DIFFICULTY;
-    let dailyTimer: ReturnType<typeof createDailyTimer> | null = null;
-    let dailyLocked = false;
-    let sessionWindow: { date: string; startedAt: number; expiresAt: number } | null = null;
-    let progressSaved = false;
-    let sessionStartedAt: number | null = null;
-    let sessionCompletedAt: number | null = null;
-    let flaggedCards = new Set<number>();
-    let goodPoints = 0;
-    let badPoints = 0;
-    let firstCard: HTMLDivElement | null = null;
-    let firstIndex: number | null = null;
-    let firstWasFlagged = false;
-    let lockBoard = true;
-    let matchedPairs = 0;
-    let gameFinished = false;
-    let saving = false;
-    let pendingResult: {
-        goodPoints: number;
-        badPoints: number;
-        percentage: number;
-    } | null = null;
-    let cards: number[] = [];
-
-    const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-    function generateCards() {
-        const cardAmount = 10 + difficulty * 2;
-        const numberLabels: number[] = [];
-
-        for (let i = 1; i <= cardAmount / 2; i++) {
-            numberLabels.push(i, i);
-        }
-
-        for (let i = numberLabels.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [numberLabels[i], numberLabels[j]] = [numberLabels[j], numberLabels[i]];
-        }
-        cards = numberLabels;
-    }
-
-    function renderCards() {
-        gameBoard.innerHTML = "";
-        cards.forEach((number, index) => {
-            const card = document.createElement("div");
-            card.classList.add("card");
-            card.textContent = "?";
-            card.addEventListener("click", () => flipCard(card, index, number));
-            gameBoard.appendChild(card);
-        });
-    }
-
-    function flipCard(card: HTMLDivElement, index: number, number: number) {
-        if (
-            lockBoard || gameFinished || card === firstCard ||
-            card.classList.contains("matched") ||
-            card.classList.contains("flipped")
-        ) return;
-
-        const wasFlagged = flaggedCards.has(index);
-        flaggedCards.add(index);
-        card.classList.add("flipped");
-        card.textContent = String(number);
-
-        if (firstCard === null) {
-            firstCard = card;
-            firstIndex = index;
-            firstWasFlagged = wasFlagged;
-            return;
-        }
-
-        lockBoard = true;
-        const previousCard = firstCard;
-        const previousIndex = firstIndex!;
-
-        if (cards[previousIndex] === cards[index]) {
-            goodPoints++;
-            previousCard.classList.add("matched");
-            card.classList.add("matched");
-            matchedPairs++;
-            resetTurn();
-
-            if (matchedPairs === cards.length / 2) {
-                gameFinished = true;
-                sessionCompletedAt = Date.now();
-                lockBoard = true;
-                const totalPoints = goodPoints + badPoints;
-                pendingResult = {
-                    goodPoints,
-                    badPoints,
-                    percentage: totalPoints === 0 ? 0 : (goodPoints / totalPoints) * 100,
-                };
-                void finishGame();
+    mountGame(document.querySelector<HTMLElement>("#game-shell"), {
+        demo: {
+            hasReachedLimit: hasReachedDemoLimit,
+            recordSession: recordDemoSession,
+            showLimit() {
+                if (!demoDialog.open) demoDialog.showModal();
+            },
+        },
+        startSession({ board, difficulty, complete }) {
+            const cardAmount = 10 + difficulty * 2;
+            const cards: number[] = [];
+            for (let i = 1; i <= cardAmount / 2; i++) cards.push(i, i);
+            for (let i = cards.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [cards[i], cards[j]] = [cards[j], cards[i]];
             }
-        } else {
-            if (firstWasFlagged || wasFlagged) badPoints++;
-            setTimeout(() => {
-                previousCard.classList.remove("flipped");
-                card.classList.remove("flipped");
-                previousCard.textContent = "?";
-                card.textContent = "?";
-                resetTurn();
-            }, 1000);
-        }
-    }
 
-    function resetTurn() {
-        firstCard = null;
-        firstIndex = null;
-        firstWasFlagged = false;
-        lockBoard = false;
-    }
+            let active = true;
+            let locked = false;
+            let firstCard: HTMLDivElement | null = null;
+            let firstIndex: number | null = null;
+            let firstWasSeen = false;
+            let matchedPairs = 0;
+            let goodPoints = 0;
+            let badPoints = 0;
+            const seenCards = new Set<number>();
+            const timeouts = new Set<ReturnType<typeof setTimeout>>();
 
-    async function finishGame() {
-        if (!pendingResult || saving) return;
-        saving = true;
-        retryButton.hidden = true;
-
-        const levelResult = handleLevel(gameType, difficulty, pendingResult);
-        status.textContent = "Saving progress...";
-
-        try {
-            if (!progressSaved) {
-                await saveDifficulty(gameSlug, levelResult.difficulty, user);
-                difficulty = levelResult.difficulty;
-                progressSaved = true;
+            function resetTurn() {
+                firstCard = null;
+                firstIndex = null;
+                firstWasSeen = false;
+                locked = false;
             }
-            // The timer reaching 0:00 alone never awards credit.
-            // Use the actual gameplay completion time, not save/retry time.
-            if (user && sessionWindow && sessionStartedAt !== null && sessionCompletedAt !== null) {
-                await completeTrainingDay(user, sessionWindow, sessionStartedAt, sessionCompletedAt);
-            }
-        } catch (error) {
-            console.error("Could not finalize Memory session:", error);
-            status.textContent = "Could not save training progress. Retry to continue.";
-            retryButton.hidden = false;
-            saving = false;
-            return;
-        }
 
-        if (!user) recordDemoSession();
-        pendingResult = null;
-        status.textContent = `Session complete. Difficulty: ${difficulty}.`;
-        if (!user && hasReachedDemoLimit()) {
-            saving = false;
-            showDemoLimit();
-            return;
-        }
-        await sleep(sessionDelay);
-        saving = false;
-        try {
-            await startNextSession();
-        } catch (error) {
-            reportTimerError(error);
-            retryButton.hidden = false;
-        }
-    }
+            function flipCard(card: HTMLDivElement, index: number, number: number) {
+                if (!active || locked || card === firstCard ||
+                    card.classList.contains("matched") || card.classList.contains("flipped")) return;
 
-    function showDailyLimit() {
-        dailyLocked = true;
-        gameFinished = true;
-        lockBoard = true;
-        gameBoard.hidden = true;
-        dailyLimitMessage.hidden = false;
-        retryButton.hidden = true;
-        status.textContent = "Today's five minutes are complete.";
-    }
+                const wasSeen = seenCards.has(index);
+                seenCards.add(index);
+                card.classList.add("flipped");
+                card.textContent = String(number);
 
-    async function startNextSession() {
-        // The session currently underway is always allowed to finish.
-        // Only check the deadline before starting the next session.
-        if (!dailyTimer || !(await dailyTimer.canStartSession())) {
-            showDailyLimit();
-            return;
-        }
-        sessionWindow = dailyTimer.getWindow();
-        dailyLocked = false;
-        gameBoard.hidden = false;
-        dailyLimitMessage.hidden = true;
-        startGame();
-    }
-
-    function showDemoLimit() {
-        gameFinished = true;
-        lockBoard = true;
-        retryButton.hidden = true;
-        status.textContent = "Demo complete: create an account to continue.";
-        if (!demoDialog.open) demoDialog.showModal();
-    }
-
-    function startGame() {
-        sessionStartedAt = Date.now();
-        sessionCompletedAt = null;
-        progressSaved = false;
-        flaggedCards.clear();
-        goodPoints = 0;
-        badPoints = 0;
-        matchedPairs = 0;
-        firstCard = null;
-        firstIndex = null;
-        firstWasFlagged = false;
-        lockBoard = false;
-        gameFinished = false;
-        pendingResult = null;
-        status.textContent = "";
-        retryButton.hidden = true;
-        generateCards();
-        renderCards();
-    }
-
-    function reportTimerError(error: unknown) {
-        console.error("Daily timer error:", error);
-        status.textContent = "Could not load daily playtime. Please retry.";
-        // Do not begin another session if rollover couldn't be verified.
-    }
-
-    async function initializeGame() {
-        retryButton.hidden = true;
-        status.textContent = "Loading progress...";
-        try {
-            user = await waitForAuth();
-            if (!user && hasReachedDemoLimit()) {
-                showDemoLimit();
-                return;
-            }
-            if (user) {
-                const daysPlayed = await loadDaysPlayed(user);
-                if (!isUnlocked(daysPlayed, unlockRequirement)) {
-                    gameBoard.hidden = true;
-                    dailyLimitMessage.hidden = false;
-                    dailyLimitMessage.querySelector("h2")!.textContent = `Game locked`;
-                    dailyLimitMessage.querySelector("p")!.textContent =
-                        `Train on ${unlockRequirement} different days to unlock ${gameBoard.dataset.gameTitle ?? "this game"}. Your progress: ${daysPlayed}.`;
-                    status.textContent = "";
+                if (firstCard === null) {
+                    firstCard = card;
+                    firstIndex = index;
+                    firstWasSeen = wasSeen;
                     return;
                 }
-            }
-            dailyTimer?.stop();
-            dailyTimer = createDailyTimer({
-                gameSlug,
-                user,
-                onTick: (remaining) => {
-                    dailyTimerLabel.textContent = `Daily time: ${formatRemaining(remaining)}`;
-                },
-                onNewDay: () => {
-                    if (dailyLocked && (user || !hasReachedDemoLimit())) {
-                        void startNextSession().catch(reportTimerError);
+
+                locked = true;
+                const previousCard = firstCard;
+                const previousIndex = firstIndex!;
+                if (cards[previousIndex] === cards[index]) {
+                    goodPoints++;
+                    previousCard.classList.add("matched");
+                    card.classList.add("matched");
+                    matchedPairs++;
+                    resetTurn();
+
+                    if (matchedPairs === cards.length / 2) {
+                        active = false;
+                        locked = true;
+                        const total = goodPoints + badPoints;
+                        complete({
+                            goodPoints,
+                            badPoints,
+                            percentage: total === 0 ? 0 : (goodPoints / total) * 100,
+                        });
                     }
-                },
-                onError: reportTimerError,
+                } else {
+                    if (firstWasSeen || wasSeen) badPoints++;
+                    const id = setTimeout(() => {
+                        timeouts.delete(id);
+                        if (!active) return;
+                        previousCard.classList.remove("flipped");
+                        card.classList.remove("flipped");
+                        previousCard.textContent = "?";
+                        card.textContent = "?";
+                        resetTurn();
+                    }, 1000);
+                    timeouts.add(id);
+                }
+            }
+
+            board.innerHTML = "";
+            cards.forEach((number, index) => {
+                const card = document.createElement("div");
+                card.classList.add("card");
+                card.textContent = "?";
+                card.addEventListener("click", () => flipCard(card, index, number));
+                board.appendChild(card);
             });
-            await dailyTimer.start();
-            difficulty = await loadDifficulty(gameSlug, user);
-            await startNextSession();
-        } catch (error) {
-            console.error("Could not load Memory progress:", error);
-            status.textContent = "Could not load progress. Retry to play.";
-            retryButton.hidden = false;
-        }
-    }
 
-    retryButton.addEventListener("click", () => {
-        if (pendingResult) void finishGame();
-        else void initializeGame();
+            return () => {
+                active = false;
+                for (const id of timeouts) clearTimeout(id);
+                timeouts.clear();
+            };
+        },
     });
-
-    window.addEventListener("pagehide", () => dailyTimer?.stop());
-    void initializeGame();
 </script>
 
 <style>
-    #demo-limit-dialog {
-        width: min(90vw, 440px);
-        padding: 2rem;
-        border: 0;
-        border-radius: 14px;
-        box-shadow: 0 12px 40px #0003;
-        text-align: center;
-    }
-
-    #demo-limit-dialog::backdrop {
-        background: #0009;
-    }
-
-    .demo-actions {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 1rem;
-    }
-
-    .demo-actions a {
-        padding: 0.75rem 1rem;
-        border-radius: 8px;
-        background: var(--theme-color);
-        color: white;
-        text-decoration: none;
-    }
-
-    #game-board {
+    :global(#game-board) {
         display: flex;
         flex-wrap: wrap;
         gap: 10px;
         padding: 10px;
     }
-
-    #game-board :global(.card) {
+    :global(#game-board .card) {
         display: flex;
         align-items: center;
         justify-content: center;
@@ -359,18 +145,21 @@ const { gameTitle = "Memory", gameType, gameSlug, unlockRequirement = 0 } = Astr
         border: 2px solid royalblue;
         cursor: pointer;
     }
-    #game-board[hidden],
-    #daily-limit-message[hidden] {
-        display: none;
-    }
-
-    #daily-limit-message {
+    #demo-limit-dialog {
+        width: min(90vw, 440px);
+        padding: 2rem;
+        border: 0;
+        border-radius: 14px;
+        box-shadow: 0 12px 40px #0003;
         text-align: center;
-        padding: 1rem;
     }
-
-    #daily-timer {
-        font-variant-numeric: tabular-nums;
-        font-weight: bold;
+    #demo-limit-dialog::backdrop { background: #0009; }
+    .demo-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; }
+    .demo-actions a {
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        background: var(--theme-color);
+        color: white;
+        text-decoration: none;
     }
 </style>
