@@ -40,7 +40,7 @@ export default defineType({
       options: {
         list: [
           { title: 'Percentage', value: 'percentage' },
-          { title: 'Two-round', value: 'two-round' },
+          { title: 'Two-phase', value: 'two-phase' },
         ],
         layout: 'dropdown',
       },

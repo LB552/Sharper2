@@ -13,7 +13,7 @@ export function handleLevel(gameType, difficulty, result) {
         }
     }
 
-    if (gameType === "two-round") {
+    if (gameType === "two-phase") {
         if (result.wins === 2) {
             levelChange = "increase";
         } else if (result.wins === 0) {

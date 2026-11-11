@@ -117,12 +117,12 @@ export function createDailyTimer({ gameSlug, user, onTick, onNewDay, onError }) 
         getWindow() {
             return windowData ? { ...windowData } : null;
         },
-        
+
         async start() {
             await refresh();
             if (!disposed) intervalId = setInterval(tick, 250);
         },
-        async canStartSession() {
+        async canStartRound() {
             if (!windowData || windowData.date !== stockholmDate()) {
                 await refresh();
             }

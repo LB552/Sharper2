@@ -4,24 +4,24 @@ import { isGameLocked } from "./demoMode.js";
 import { createDailyTimer, formatRemaining } from "./dailyTimer.js";
 import { loadDaysPlayed, completeTrainingDay, isUnlocked } from "./daysPlayed.js";
 
-const SESSION_DELAY_MS = 1000;
+const ROUND_DELAY_MS = 1000;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Shared lifecycle for all Sharper games.
  *
- * startSession({board, difficulty, complete}) is the only required game-specific
+ * startRound({board, difficulty, complete}) is the only required game-specific
  * operation. Call complete(result) exactly when gameplay is finished. The
- * result shape depends on gameType (percentage or two-round); handleLevel
+ * result shape depends on gameType (percentage or two-phase); handleLevel
  * remains the single source of truth for difficulty changes.
  *
- * startSession may return a cleanup function. It is called when that session
- * ends/is replaced, so pending animation timeouts cannot affect a new session.
+ * startRound may return a cleanup function. It is called when that round
+ * ends/is replaced, so pending animation timeouts cannot affect a new round.
  *
  * demo is an optional Memory-specific adapter:
- * { hasReachedLimit, recordSession, showLimit }
+ * { hasReachedLimit, recordRound, showLimit }
  */
-export function mountGame(root, { startSession, demo = null }) {
+export function mountGame(root, { startRound, demo = null }) {
     if (!root) throw new Error("Game shell was not found");
 
     const board = root.querySelector("#game-board");
@@ -41,27 +41,27 @@ export function mountGame(root, { startSession, demo = null }) {
     let difficulty = DEFAULT_DIFFICULTY;
     let dailyTimer = null;
     let dailyLocked = false;
-    let sessionWindow = null;
-    let sessionStartedAt = null;
-    let sessionCompletedAt = null;
+    let roundWindow = null;
+    let roundStartedAt = null;
+    let roundCompletedAt = null;
     let pendingResult = null;
     let progressSaved = false;
     let saving = false;
     let starting = false;
-    let sessionCleanup = null;
-    let sessionToken = 0;
+    let roundCleanup = null;
+    let roundToken = 0;
     let disposed = false;
 
-    function cleanupSession() {
-        sessionToken++;
-        const cleanup = sessionCleanup;
-        sessionCleanup = null;
+    function cleanupRound() {
+        roundToken++;
+        const cleanup = roundCleanup;
+        roundCleanup = null;
         cleanup?.();
     }
 
     function showDailyLimit() {
         dailyLocked = true;
-        cleanupSession();
+        cleanupRound();
         board.hidden = true;
         dailyMessage.hidden = false;
         retryButton.hidden = true;
@@ -69,7 +69,7 @@ export function mountGame(root, { startSession, demo = null }) {
     }
 
     function showLocked(title, description, showSignup) {
-        cleanupSession();
+        cleanupRound();
         board.hidden = true;
         timerLabel.hidden = true;
         lockedMessage.hidden = false;
@@ -81,7 +81,7 @@ export function mountGame(root, { startSession, demo = null }) {
     }
 
     function showDemoLimit() {
-        cleanupSession();
+        cleanupRound();
         board.hidden = true;
         retryButton.hidden = true;
         status.textContent = "Demo complete: create an account to continue.";
@@ -94,21 +94,21 @@ export function mountGame(root, { startSession, demo = null }) {
         retryButton.hidden = false;
     }
 
-    async function startNextSession() {
+    async function startNextRound() {
         if (starting || disposed) return;
         starting = true;
         try {
-            if (!dailyTimer || !(await dailyTimer.canStartSession())) {
+            if (!dailyTimer || !(await dailyTimer.canStartRound())) {
                 showDailyLimit();
                 return;
             }
-            // A session keeps the ORIGINAL window even if midnight passes.
+            // A round keeps the ORIGINAL window even if midnight passes.
             const window = dailyTimer.getWindow();
             if (!window) throw new Error("No daily timer window is available");
-            cleanupSession();
-            sessionWindow = window;
-            sessionStartedAt = Date.now();
-            sessionCompletedAt = null;
+            cleanupRound();
+            roundWindow = window;
+            roundStartedAt = Date.now();
+            roundCompletedAt = null;
             pendingResult = null;
             progressSaved = false;
             dailyLocked = false;
@@ -119,24 +119,24 @@ export function mountGame(root, { startSession, demo = null }) {
             retryButton.hidden = true;
             status.textContent = "";
 
-            const token = sessionToken;
-            const cleanup = startSession({
+            const token = roundToken;
+            const cleanup = startRound({
                 board,
                 difficulty,
                 complete(result) {
-                    if (disposed || token !== sessionToken || pendingResult !== null) return;
-                    sessionCompletedAt = Date.now();
+                    if (disposed || token !== roundToken || pendingResult !== null) return;
+                    roundCompletedAt = Date.now();
                     pendingResult = result;
-                    void finishSession();
+                    void finishRound();
                 },
             });
-            if (typeof cleanup === "function") sessionCleanup = cleanup;
+            if (typeof cleanup === "function") roundCleanup = cleanup;
         } finally {
             starting = false;
         }
     }
 
-    async function finishSession() {
+    async function finishRound() {
         if (!pendingResult || saving || disposed) return;
         saving = true;
         retryButton.hidden = true;
@@ -149,32 +149,32 @@ export function mountGame(root, { startSession, demo = null }) {
                 difficulty = next;
                 progressSaved = true;
             }
-            // The original session's completion timestamp is preserved on
+            // The original round's completion timestamp is preserved on
             // retries, ensuring a slow write never earns undeserved credit.
-            if (user && sessionWindow && sessionStartedAt !== null && sessionCompletedAt !== null) {
-                await completeTrainingDay(user, sessionWindow, sessionStartedAt, sessionCompletedAt);
+            if (user && roundWindow && roundStartedAt !== null && roundCompletedAt !== null) {
+                await completeTrainingDay(user, roundWindow, roundStartedAt, roundCompletedAt);
             }
         } catch (error) {
-            console.error(`Could not finalize ${gameTitle} session:`, error);
+            console.error(`Could not finalize ${gameTitle} round:`, error);
             status.textContent = "Could not save training progress. Retry to continue.";
             retryButton.hidden = false;
             saving = false;
             return;
         }
 
-        if (!user) demo?.recordSession();
+        if (!user) demo?.recordRound();
         pendingResult = null;
-        cleanupSession();
-        status.textContent = `Session complete. Difficulty: ${difficulty}.`;
+        cleanupRound();
+        status.textContent = `Round complete. Difficulty: ${difficulty}.`;
         if (!user && demo?.hasReachedLimit()) {
             saving = false;
             showDemoLimit();
             return;
         }
-        await sleep(SESSION_DELAY_MS);
+        await sleep(ROUND_DELAY_MS);
         saving = false;
         try {
-            await startNextSession();
+            await startNextRound();
         } catch (error) {
             reportTimerError(error);
         }
@@ -214,7 +214,7 @@ export function mountGame(root, { startSession, demo = null }) {
                 },
                 onNewDay: () => {
                     if (dailyLocked && (user || !demo?.hasReachedLimit())) {
-                        void startNextSession().catch(reportTimerError);
+                        void startNextRound().catch(reportTimerError);
                     }
                 },
                 onError: reportTimerError,
@@ -222,7 +222,7 @@ export function mountGame(root, { startSession, demo = null }) {
             await dailyTimer.start();
             difficulty = await loadDifficulty(gameSlug, user);
             if (disposed) return;
-            await startNextSession();
+            await startNextRound();
         } catch (error) {
             console.error(`Could not load ${gameTitle} progress:`, error);
             status.textContent = "Could not load progress. Retry to play.";
@@ -231,13 +231,13 @@ export function mountGame(root, { startSession, demo = null }) {
     }
 
     const retry = () => {
-        if (pendingResult) void finishSession();
+        if (pendingResult) void finishRound();
         else void initialize();
     };
     const dispose = () => {
         disposed = true;
         dailyTimer?.stop();
-        cleanupSession();
+        cleanupRound();
         retryButton.removeEventListener("click", retry);
         window.removeEventListener("pagehide", dispose);
     };

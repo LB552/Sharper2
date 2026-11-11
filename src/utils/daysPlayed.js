@@ -19,24 +19,24 @@ export async function loadDaysPlayed(user) {
     return countOrZero(snapshot.data()?.daysPlayed);
 }
 
-// Call only when a session has genuinely finished and its difficulty has been saved.
+// Call only when a round has genuinely finished and its difficulty has been saved.
 // The completion timestamp is captured at the moment gameplay finishes, not after
 // Firestore writes/retries, so slow writes cannot turn an early finish into credit.
-// The date belongs to the SESSION'S START, not its completion (even at midnight).
-export async function completeTrainingDay(user, sessionWindow, sessionStartedAt, completedAt) {
-    if (!user || !sessionWindow) return { credited: false };
-    if (![sessionStartedAt, completedAt, sessionWindow.startedAt, sessionWindow.expiresAt]
-        .every(Number.isFinite)) throw new Error("Invalid session timing");
+// The date belongs to the ROUND'S START, not its completion (even at midnight).
+export async function completeTrainingDay(user, roundWindow, roundStartedAt, completedAt) {
+    if (!user || !roundWindow) return { credited: false };
+    if (![roundStartedAt, completedAt, roundWindow.startedAt, roundWindow.expiresAt]
+        .every(Number.isFinite)) throw new Error("Invalid round timing");
 
-    if (sessionStartedAt < sessionWindow.startedAt ||
-        sessionStartedAt >= sessionWindow.expiresAt ||
-        completedAt < sessionStartedAt ||
-        completedAt < sessionWindow.expiresAt) {
+    if (roundStartedAt < roundWindow.startedAt ||
+        roundStartedAt >= roundWindow.expiresAt ||
+        completedAt < roundStartedAt ||
+        completedAt < roundWindow.expiresAt) {
         return { credited: false };
     }
 
-    const date = stockholmDate(sessionStartedAt);
-    if (date !== sessionWindow.date) return { credited: false };
+    const date = stockholmDate(roundStartedAt);
+    if (date !== roundWindow.date) return { credited: false };
 
     const reference = doc(db, "gameSaves", user.uid);
     return runTransaction(db, async transaction => {

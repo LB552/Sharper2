@@ -9,14 +9,14 @@ const { gameTitle = "Lights", gameType, gameSlug, unlockRequirement = 0 } = Astr
     import { mountGame } from "../utils/gameController.js";
 
     mountGame(document.querySelector<HTMLElement>("#game-shell"), {
-        startSession({ board, difficulty, complete }) {
+        startRound({ board, difficulty, complete }) {
             const LIGHT_COUNT = 6;
-            const ROUNDS_PER_SESSION = 2;
+            const PHASES_PER_ROUND = 2;
             const INITIAL_DELAY = 250;
             const FLASH_DURATION = 500;
             const FLASH_DELAY = 250;
             const CLICK_DURATION = 200;
-            const ROUND_DELAY = 1000;
+            const PHASE_DELAY = 1000;
 
             let active = true;
             let inputLocked = true;
@@ -24,7 +24,7 @@ const { gameTitle = "Lights", gameType, gameSlug, unlockRequirement = 0 } = Astr
             let playerSequence: number[] = [];
             let wins = 0;
             let losses = 0;
-            let currentRound = 0;
+            let currentPhase = 0;
             const timeouts = new Set<ReturnType<typeof setTimeout>>();
 
             function schedule(callback: () => void, ms: number) {
@@ -62,23 +62,23 @@ const { gameTitle = "Lights", gameType, gameSlug, unlockRequirement = 0 } = Astr
                 inputLocked = false;
             }
 
-            function startRound() {
+            function startPhase() {
                 if (!active) return;
                 playerSequence = [];
                 generateSequence();
                 void flashSequence();
             }
 
-            function finishRound(won: boolean) {
+            function finishPhase(won: boolean) {
                 inputLocked = true;
                 if (won) wins++;
                 else losses++;
-                currentRound++;
-                if (currentRound === ROUNDS_PER_SESSION) {
+                currentPhase++;
+                if (currentPhase === PHASES_PER_ROUND) {
                     active = false;
                     complete({ wins, losses });
                 } else {
-                    schedule(startRound, ROUND_DELAY);
+                    schedule(startPhase, PHASE_DELAY);
                 }
             }
 
@@ -88,8 +88,8 @@ const { gameTitle = "Lights", gameType, gameSlug, unlockRequirement = 0 } = Astr
                 light.classList.add("active");
                 schedule(() => light.classList.remove("active"), CLICK_DURATION);
                 const position = playerSequence.length - 1;
-                if (sequence[position] !== index) finishRound(false);
-                else if (playerSequence.length === sequence.length) finishRound(true);
+                if (sequence[position] !== index) finishPhase(false);
+                else if (playerSequence.length === sequence.length) finishPhase(true);
             }
 
             board.innerHTML = "";
@@ -99,7 +99,7 @@ const { gameTitle = "Lights", gameType, gameSlug, unlockRequirement = 0 } = Astr
                 light.addEventListener("click", () => clickLight(i, light));
                 board.appendChild(light);
             }
-            startRound();
+            startPhase();
 
             return () => {
                 active = false;

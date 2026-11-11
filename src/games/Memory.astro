@@ -17,19 +17,19 @@ const { gameTitle = "Memory", gameType, gameSlug, unlockRequirement = 0 } = Astr
 
 <script>
     import { mountGame } from "../utils/gameController.js";
-    import { hasReachedDemoLimit, recordDemoSession } from "../utils/demoMode.js";
+    import { hasReachedDemoLimit, recordDemoRound } from "../utils/demoMode.js";
 
     const demoDialog = document.querySelector<HTMLDialogElement>("#demo-limit-dialog")!;
 
     mountGame(document.querySelector<HTMLElement>("#game-shell"), {
         demo: {
             hasReachedLimit: hasReachedDemoLimit,
-            recordSession: recordDemoSession,
+            recordRound: recordDemoRound,
             showLimit() {
                 if (!demoDialog.open) demoDialog.showModal();
             },
         },
-        startSession({ board, difficulty, complete }) {
+        startRound({ board, difficulty, complete }) {
             const cardAmount = 10 + difficulty * 2;
             const cards: number[] = [];
             for (let i = 1; i <= cardAmount / 2; i++) cards.push(i, i);
