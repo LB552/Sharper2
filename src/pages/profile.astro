@@ -1,0 +1,429 @@
+<h1>Profile</h1>
+
+<p id="profile-message" role="status" aria-live="polite">
+    Loading profile...
+</p>
+
+<div id="profile-content" hidden>
+    <!-- USERNAME -->
+    <section>
+        <h2>Change username</h2>
+
+        <p>Current username: <span id="current-username"></span></p>
+
+        <form id="username-form">
+            <input
+                type="text"
+                id="new-username"
+                placeholder="New username"
+                autocomplete="off"
+                minlength="3"
+                maxlength="20"
+                pattern="[A-Za-z0-9_]+"
+                title="Use 3–20 letters, numbers, or underscores."
+                required
+            >
+
+            <input
+                type="text"
+                id="confirm-username"
+                placeholder="Repeat new username"
+                autocomplete="off"
+                minlength="3"
+                maxlength="20"
+                pattern="[A-Za-z0-9_]+"
+                required
+            >
+
+            <button type="submit">Change username</button>
+
+            <p id="username-message" role="status" aria-live="polite"></p>
+        </form>
+    </section>
+
+    <!-- EMAIL -->
+    <section>
+        <h2>Change email</h2>
+
+        <p>Current email: <span id="current-email"></span></p>
+
+        <form id="email-form">
+            <input
+                type="email"
+                id="new-email"
+                placeholder="New email"
+                autocomplete="new-email"
+                required
+            >
+
+            <input
+                type="email"
+                id="confirm-email"
+                placeholder="Repeat new email"
+                autocomplete="off"
+                required
+            >
+
+
+            <button type="submit">Change email</button>
+
+            <p id="email-message" role="status" aria-live="polite"></p>
+        </form>
+    </section>
+
+    <!-- PASSWORD -->
+    <section>
+        <h2>Change password</h2>
+
+        <form id="password-form">
+            <input
+                type="password"
+                id="current-password"
+                placeholder="Current password"
+                autocomplete="current-password"
+                required
+            >
+
+            <input
+                type="password"
+                id="new-password"
+                placeholder="New password"
+                autocomplete="new-password"
+                minlength="6"
+                required
+            >
+
+            <input
+                type="password"
+                id="confirm-password"
+                placeholder="Repeat new password"
+                autocomplete="new-password"
+                minlength="6"
+                required
+            >
+
+            <button type="submit">Change password</button>
+
+            <p id="password-message" role="status" aria-live="polite"></p>
+        </form>
+    </section>
+</div>
+
+<script>
+    import { auth, db } from "../firebase.js";
+    import {
+        onAuthStateChanged,
+        updateEmail,
+        updatePassword,
+        EmailAuthProvider,
+        reauthenticateWithCredential,
+    } from "firebase/auth";
+    import { doc, getDoc, updateDoc } from "firebase/firestore";
+    import { FirebaseError } from "firebase/app";
+
+    // ELEMENTS
+
+    const currentPassword = document.querySelector<HTMLInputElement>(
+        "#current-password"
+    );
+
+    const profileMessage = document.querySelector<HTMLParagraphElement>(
+        "#profile-message"
+    );
+
+    const profileContent = document.querySelector<HTMLDivElement>(
+        "#profile-content"
+    );
+
+    const currentUsername = document.querySelector<HTMLSpanElement>(
+        "#current-username"
+    );
+
+    const currentEmail = document.querySelector<HTMLSpanElement>(
+        "#current-email"
+    );
+
+    const usernameForm = document.querySelector<HTMLFormElement>(
+        "#username-form"
+    );
+
+    const newUsername = document.querySelector<HTMLInputElement>(
+        "#new-username"
+    );
+
+    const confirmUsername = document.querySelector<HTMLInputElement>(
+        "#confirm-username"
+    );
+
+    const usernameMessage = document.querySelector<HTMLParagraphElement>(
+        "#username-message"
+    );
+
+    const emailForm = document.querySelector<HTMLFormElement>(
+        "#email-form"
+    );
+
+    const newEmail = document.querySelector<HTMLInputElement>(
+        "#new-email"
+    );
+
+    const confirmEmail = document.querySelector<HTMLInputElement>(
+        "#confirm-email"
+    );
+
+    const emailMessage = document.querySelector<HTMLParagraphElement>(
+        "#email-message"
+    );
+
+    const passwordForm = document.querySelector<HTMLFormElement>(
+        "#password-form"
+    );
+
+    const newPassword = document.querySelector<HTMLInputElement>(
+        "#new-password"
+    );
+
+    const confirmPassword = document.querySelector<HTMLInputElement>(
+        "#confirm-password"
+    );
+
+    const passwordMessage = document.querySelector<HTMLParagraphElement>(
+        "#password-message"
+    );
+
+    // ERROR HANDLING
+
+    function getErrorMessage(error: unknown): string {
+        if (error instanceof FirebaseError) {
+            console.error("Profile error:", error.code);
+
+            switch (error.code) {
+                case "auth/requires-recent-login":
+                    return "Please log out and log in again before changing this.";
+
+                case "auth/email-already-in-use":
+                    return "This email is already registered.";
+
+                case "auth/invalid-email":
+                    return "Please enter a valid email.";
+
+                case "auth/weak-password":
+                    return "Choose a stronger password.";
+
+                case "auth/operation-not-allowed":
+                    return "This change is not allowed by Firebase.";
+
+                case "permission-denied":
+                    return "Firestore permission denied.";
+            }
+        }
+
+        return "Something went wrong. Please try again.";
+    }
+
+    // LOAD PROFILE
+
+    onAuthStateChanged(auth, async (user) => {
+        if (profileContent) {
+            profileContent.hidden = true;
+        }
+
+        if (!user) {
+            window.location.href = "/login";
+            return;
+        }
+
+        try {
+            const snapshot = await getDoc(doc(db, "users", user.uid));
+
+            if (auth.currentUser?.uid !== user.uid) return;
+
+            if (currentUsername) {
+                currentUsername.textContent = snapshot.exists()
+                    ? snapshot.data().username ?? ""
+                    : "";
+            }
+
+            if (currentEmail) {
+                currentEmail.textContent = user.email ?? "";
+            }
+
+            if (profileContent) {
+                profileContent.hidden = false;
+            }
+
+            if (profileMessage) {
+                profileMessage.textContent = "";
+            }
+        } catch (error) {
+            if (profileMessage) {
+                profileMessage.textContent = getErrorMessage(error);
+            }
+        }
+    });
+
+    // CHANGE USERNAME
+
+    usernameForm?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const user = auth.currentUser;
+
+        if (
+            !user ||
+            !newUsername ||
+            !confirmUsername ||
+            !usernameMessage
+        ) return;
+
+        const username = newUsername.value.trim();
+
+        if (username !== confirmUsername.value.trim()) {
+            usernameMessage.textContent = "Usernames do not match.";
+            return;
+        }
+
+        if (!/^[A-Za-z0-9_]{3,20}$/.test(username)) {
+            usernameMessage.textContent =
+                "Use 3–20 letters, numbers, or underscores.";
+            return;
+        }
+
+        usernameMessage.textContent = "Updating username...";
+
+        try {
+            await updateDoc(doc(db, "users", user.uid), {
+                username,
+                usernameLower: username.toLowerCase(),
+            });
+
+            if (currentUsername) {
+                currentUsername.textContent = username;
+            }
+
+            usernameForm.reset();
+            usernameMessage.textContent = "Username updated successfully.";
+        } catch (error) {
+            usernameMessage.textContent = getErrorMessage(error);
+        }
+    });
+
+    // CHANGE EMAIL
+
+    emailForm?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const user = auth.currentUser;
+
+        if (
+            !user ||
+            !newEmail ||
+            !confirmEmail ||
+            !emailMessage
+        ) return;
+
+        const email = newEmail.value.trim();
+
+        if (email !== confirmEmail.value.trim()) {
+            emailMessage.textContent = "Email addresses do not match.";
+            return;
+        }
+
+        if (email === user.email) {
+            emailMessage.textContent =
+                "This is already your current email.";
+            return;
+        }
+
+        emailMessage.textContent = "Updating email...";
+
+        try {
+            // Update Firebase Authentication.
+            await updateEmail(user, email);
+
+            // Keep the Firestore profile in sync.
+            try {
+                await updateDoc(doc(db, "users", user.uid), {
+                    email,
+                });
+            } catch (firestoreError) {
+                console.error(
+                    "Email changed in Auth, but Firestore sync failed:",
+                    firestoreError
+                );
+
+                if (currentEmail) {
+                    currentEmail.textContent = email;
+                }
+
+                emailMessage.textContent =
+                    "Email changed, but the profile record could not be updated.";
+                return;
+            }
+
+            if (currentEmail) {
+                currentEmail.textContent = email;
+            }
+
+            emailForm.reset();
+            emailMessage.textContent = "Email updated successfully.";
+        } catch (error) {
+            emailMessage.textContent = getErrorMessage(error);
+        }
+    });
+
+
+    // CHANGE PASSWORD
+
+    passwordForm?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const user = auth.currentUser;
+
+        if (
+            !user ||
+            !currentPassword ||
+            !newPassword ||
+            !confirmPassword ||
+            !passwordMessage
+        ) return;
+
+        if (newPassword.value !== confirmPassword.value) {
+            passwordMessage.textContent = "Passwords do not match.";
+            return;
+        }
+
+        passwordMessage.textContent = "Updating password...";
+
+        try {
+            // Verify the user's current password.
+            const credential = EmailAuthProvider.credential(
+                user.email!,
+                currentPassword.value
+            );
+
+            await reauthenticateWithCredential(user, credential);
+
+            // Update the password after successful verification.
+            await updatePassword(user, newPassword.value);
+
+            passwordForm.reset();
+
+            passwordMessage.textContent =
+                "Password updated successfully.";
+        } catch (error) {
+            if (
+                error instanceof FirebaseError &&
+                (
+                    error.code === "auth/wrong-password" ||
+                    error.code === "auth/invalid-credential"
+                )
+            ) {
+                passwordMessage.textContent =
+                    "Current password is incorrect.";
+            } else {
+                passwordMessage.textContent = getErrorMessage(error);
+            }
+        }
+    });
+</script>

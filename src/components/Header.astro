@@ -1,4 +1,31 @@
 <header class="site-header">
+    <div class="header-user">
+        <a
+            href="/profile"
+            id="user-info"
+            class="user-info"
+            aria-label="View your profile"
+            hidden
+        >
+            <svg
+                class="profile-icon"
+                viewBox="0 0 100 100"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+            >
+                <circle cx="50" cy="50" r="45" />
+                <circle cx="50" cy="39" r="17" />
+                <path d="M20 83 C24 63 36 56 50 56 C64 56 76 63 80 83" />
+            </svg>
+
+            <span id="username"></span>
+        </a>
+    </div>
+
     <a href="/" class="site-logo">
         Sharper
     </a>
@@ -28,7 +55,8 @@
 
 <script>
     import { onAuthStateChanged } from "firebase/auth";
-    import { auth } from "../firebase.js";
+    import { doc, getDoc } from "firebase/firestore";
+    import { auth, db } from "../firebase.js";
     import { logout } from "../utils/authHandler.js";
 
     const loginButton = document.querySelector<HTMLAnchorElement>(
@@ -43,14 +71,62 @@
         "#logout-message"
     );
 
-    // Update buttons based on authentication status.
-    onAuthStateChanged(auth, (user) => {
+    const userInfo = document.querySelector<HTMLAnchorElement>(
+        "#user-info"
+    );
+
+    const usernameElement = document.querySelector<HTMLSpanElement>(
+        "#username"
+    );
+
+    // Update buttons and username based on authentication status.
+    onAuthStateChanged(auth, async (user) => {
         if (loginButton) {
             loginButton.hidden = !!user;
         }
 
         if (logoutButton) {
             logoutButton.hidden = !user;
+        }
+
+        if (userInfo) {
+            userInfo.hidden = true;
+        }
+
+        if (usernameElement) {
+            usernameElement.textContent = "";
+        }
+
+        if (!user) {
+            return;
+        }
+
+        try {
+            const userSnapshot = await getDoc(
+                doc(db, "users", user.uid)
+            );
+
+            // Ignore an outdated result if the user logged out
+            // while the Firestore request was running.
+            if (auth.currentUser?.uid !== user.uid) {
+                return;
+            }
+
+            if (userSnapshot.exists()) {
+                const username = userSnapshot.data().username;
+
+                if (typeof username === "string" && username) {
+                    if (usernameElement) {
+                        usernameElement.textContent = username;
+                    }
+
+                    if (userInfo) {
+                        userInfo.hidden = false;
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("Could not load username:", error);
         }
     });
 
@@ -92,16 +168,64 @@
         background-color: var(--theme-color);
     }
 
+    /* Left section: profile icon and username */
+    .header-user {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        align-items: center;
+    }
+
+    .user-info {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-width: 0;
+        color: white;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    .user-info:focus-visible {
+        outline: 3px solid white;
+        outline-offset: 4px;
+        border-radius: 4px;
+    }
+
+    .user-info[hidden] {
+        display: none;
+    }
+
+    .profile-icon {
+        width: 28px;
+        height: 28px;
+        flex-shrink: 0;
+    }
+
+    #username {
+        font-size: 0.875rem;
+        font-weight: 600;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Center section: site title */
     .site-logo {
+        flex-shrink: 0;
         color: white;
         font-size: 1.5rem;
         font-weight: bold;
         text-decoration: none;
     }
 
+    /* Right section: authentication buttons */
     .header-nav {
+        flex: 1;
+        min-width: 0;
         display: flex;
         align-items: center;
+        justify-content: flex-end;
         gap: 1rem;
     }
 
@@ -162,6 +286,33 @@
 
         .auth-button {
             font-size: 1rem;
+        }
+
+        #username {
+            font-size: 1rem;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .site-header {
+            gap: 0.5rem;
+        }
+
+        .user-info {
+            gap: 0.3rem;
+        }
+
+        .profile-icon {
+            width: 22px;
+            height: 22px;
+        }
+
+        #username {
+            font-size: 0.75rem;
+        }
+
+        .auth-button {
+            padding: 0.5rem;
         }
     }
 
