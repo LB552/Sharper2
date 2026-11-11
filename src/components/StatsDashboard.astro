@@ -31,6 +31,7 @@
 
         <div class="stats-content">
             <p>Days played: <span id="stats-days-played">0</span></p>
+            <p>Current daily streak: <span id="stats-daily-streak">0</span></p>
         </div>
 
         <!-- FOOTER -->
@@ -51,6 +52,10 @@
 
     const daysPlayedElement = document.querySelector<HTMLSpanElement>(
         "#stats-days-played"
+    );
+
+    const dailyStreakElement = document.querySelector<HTMLSpanElement>(
+        "#stats-daily-streak"
     );
 
     const dashboard = document.querySelector<HTMLDivElement>(
@@ -76,6 +81,42 @@
     let previousFocus: HTMLElement | null = null;
     let previousBodyOverflow = "";
 
+    // DAILY STREAK
+
+    function calculateDailyStreak(
+        creditedDays: Record<string, boolean>
+    ): number {
+        // Get today's date in Stockholm.
+        const today = new Intl.DateTimeFormat("sv-SE", {
+            timeZone: "Europe/Stockholm",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+        }).format(new Date());
+
+        // Use UTC calendar arithmetic to avoid daylight saving issues.
+        const date = new Date(`${today}T00:00:00Z`);
+
+        function dateKey(): string {
+            return date.toISOString().slice(0, 10);
+        }
+
+        // If today isn't credited, start checking from yesterday.
+        if (!creditedDays[dateKey()]) {
+            date.setUTCDate(date.getUTCDate() - 1);
+        }
+
+        let streak = 0;
+
+        // Count consecutive credited days backwards.
+        while (creditedDays[dateKey()]) {
+            streak++;
+            date.setUTCDate(date.getUTCDate() - 1);
+        }
+
+        return streak;
+    }
+
     // AUTHENTICATION
 
     onAuthStateChanged(auth, async (user) => {
@@ -84,6 +125,10 @@
 
             if (daysPlayedElement) {
                 daysPlayedElement.textContent = "0";
+            }
+
+            if (dailyStreakElement) {
+                dailyStreakElement.textContent = "0";
             }
 
             return;
@@ -97,21 +142,34 @@
             // Ignore results if the signed-in user has changed.
             if (auth.currentUser?.uid !== user.uid) return;
 
-            const daysPlayed = snapshot.exists()
-                ? snapshot.data().daysPlayed ?? 0
-                : 0;
+            const data = snapshot.exists() ? snapshot.data() : {};
+
+            // DAYS PLAYED
+            const daysPlayed = data.daysPlayed ?? 0;
 
             if (daysPlayedElement) {
                 daysPlayedElement.textContent = String(daysPlayed);
             }
-        } catch (error) {
-            console.error("Could not load days played:", error);
 
-            if (
-                daysPlayedElement &&
-                auth.currentUser?.uid === user.uid
-            ) {
-                daysPlayedElement.textContent = "Unavailable";
+            // DAILY STREAK
+            const creditedDays = data.creditedDays ?? {};
+            const dailyStreak = calculateDailyStreak(creditedDays);
+
+            if (dailyStreakElement) {
+                dailyStreakElement.textContent = String(dailyStreak);
+            }
+
+        } catch (error) {
+            console.error("Could not load stats:", error);
+
+            if (auth.currentUser?.uid === user.uid) {
+                if (daysPlayedElement) {
+                    daysPlayedElement.textContent = "Unavailable";
+                }
+
+                if (dailyStreakElement) {
+                    dailyStreakElement.textContent = "Unavailable";
+                }
             }
         }
     });
