@@ -2,7 +2,12 @@ import { DEFAULT_DIFFICULTY, handleLevel } from "./levelHandler.js";
 import { waitForAuth, loadDifficulty, saveDifficulty } from "./gameProgress.js";
 import { isGameLocked } from "./demoMode.js";
 import { createDailyTimer, formatRemaining } from "./dailyTimer.js";
-import { loadDaysPlayed, completeTrainingDay, isUnlocked } from "./daysPlayed.js";
+import {
+    loadDaysPlayed,
+    completeTrainingDay,
+    isUnlocked,
+    recordCompletedSession,
+} from "./daysPlayed.js";
 
 const ROUND_DELAY_MS = 1000;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -151,8 +156,27 @@ export function mountGame(root, { startRound, demo = null }) {
             }
             // The original round's completion timestamp is preserved on
             // retries, ensuring a slow write never earns undeserved credit.
-            if (user && roundWindow && roundStartedAt !== null && roundCompletedAt !== null) {
-                await completeTrainingDay(user, roundWindow, roundStartedAt, roundCompletedAt);
+            if (
+                user &&
+                roundWindow &&
+                roundStartedAt !== null &&
+                roundCompletedAt !== null
+            ) {
+                await completeTrainingDay(
+                    user,
+                    roundWindow,
+                    roundStartedAt,
+                    roundCompletedAt
+                );
+
+                // Only count a session once its five-minute window has expired.
+                if (roundCompletedAt >= roundWindow.startedAt + 5 * 60 * 1000) {
+                    await recordCompletedSession(
+                        user,
+                        gameSlug,
+                        roundWindow.dateKey
+                    );
+                }
             }
         } catch (error) {
             console.error(`Could not finalize ${gameTitle} round:`, error);

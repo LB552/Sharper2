@@ -36,6 +36,14 @@
                 Highest difficulty reached:{" "}
                 <span id="stats-highest-difficulty">—</span>
             </p>
+            <p>
+                Total sessions played:{" "}
+                <span id="stats-total-sessions">0</span>
+            </p>
+            <p>
+                Estimated training time:{" "}
+                <span id="stats-estimated-time">0m</span>
+            </p>
         </div>
 
         <!-- FOOTER -->
@@ -53,6 +61,14 @@
     import { doc, getDoc } from "firebase/firestore";
 
     // ELEMENTS
+
+    const totalSessionsElement = document.querySelector<HTMLSpanElement>(
+        "#stats-total-sessions"
+    );
+
+    const estimatedTimeElement = document.querySelector<HTMLSpanElement>(
+        "#stats-estimated-time"
+    );
 
     const daysPlayedElement = document.querySelector<HTMLSpanElement>(
         "#stats-days-played"
@@ -163,11 +179,56 @@
         return `${highest} — ${gameNames.join(", ")}`;
     }
 
+    // COMPLETED SESSIONS
+
+    function countCompletedSessions(
+        completedSessions: Record<string, Record<string, boolean>>
+    ): number {
+        let total = 0;
+
+        for (const games of Object.values(completedSessions)) {
+            for (const completed of Object.values(games)) {
+                if (completed === true) {
+                    total++;
+                }
+            }
+        }
+
+        return total;
+    }
+
+    // ESTIMATED TRAINING TIME
+
+    function formatEstimatedTime(sessions: number): string {
+        const totalMinutes = sessions * 5;
+
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+
+        if (hours === 0) {
+            return `${minutes}m`;
+        }
+
+        if (minutes === 0) {
+            return `${hours}h`;
+        }
+
+        return `${hours}h ${minutes}m`;
+    }
+
     // AUTHENTICATION
 
     onAuthStateChanged(auth, async (user) => {
         if (!user) {
             closeDashboard();
+
+            if (totalSessionsElement) {
+                totalSessionsElement.textContent = "0";
+            }
+
+            if (estimatedTimeElement) {
+                estimatedTimeElement.textContent = "0m";
+            }
 
             if (daysPlayedElement) {
                 daysPlayedElement.textContent = "0";
@@ -216,10 +277,31 @@
                 highestDifficultyElement.textContent = highestDifficulty;
             }
 
+            // COMPLETED SESSIONS AND ESTIMATED TIME
+
+            const completedSessions = data.completedSessions ?? {};
+            const totalSessions = countCompletedSessions(completedSessions);
+            const estimatedTime = formatEstimatedTime(totalSessions);
+
+            if (totalSessionsElement) {
+                totalSessionsElement.textContent = String(totalSessions);
+            }
+
+            if (estimatedTimeElement) {
+                estimatedTimeElement.textContent = estimatedTime;
+            }
         } catch (error) {
             console.error("Could not load stats:", error);
 
             if (auth.currentUser?.uid === user.uid) {
+                if (totalSessionsElement) {
+                    totalSessionsElement.textContent = "Unavailable";
+                }
+
+                if (estimatedTimeElement) {
+                    estimatedTimeElement.textContent = "Unavailable";
+                }
+
                 if (daysPlayedElement) {
                     daysPlayedElement.textContent = "Unavailable";
                 }

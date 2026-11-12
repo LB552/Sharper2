@@ -6,6 +6,37 @@ function countOrZero(value) {
     return Number.isSafeInteger(value) && value >= 0 ? value : 0;
 }
 
+export async function recordCompletedSession(user, gameSlug, dateKey) {
+    if (!user) return;
+
+    const saveRef = doc(db, "gameSaves", user.uid);
+
+    await runTransaction(db, async (transaction) => {
+        const snapshot = await transaction.get(saveRef);
+
+        const completedSessions = snapshot.exists()
+            ? snapshot.data().completedSessions ?? {}
+            : {};
+
+        // Don't count the same game's session twice on one date.
+        if (completedSessions[dateKey]?.[gameSlug]) {
+            return;
+        }
+
+        transaction.set(
+            saveRef,
+            {
+                completedSessions: {
+                    [dateKey]: {
+                        [gameSlug]: true,
+                    },
+                },
+            },
+            { merge: true }
+        );
+    });
+}
+
 export function isUnlocked(daysPlayed, unlockRequirement) {
     return Number.isSafeInteger(daysPlayed) && daysPlayed >= 0 &&
         Number.isInteger(unlockRequirement) && unlockRequirement >= 0 &&
