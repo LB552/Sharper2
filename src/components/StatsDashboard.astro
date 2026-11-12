@@ -30,20 +30,51 @@
         </div>
 
         <div class="stats-content">
-            <p>Days played: <span id="stats-days-played">0</span></p>
-            <p>Current daily streak: <span id="stats-daily-streak">0</span></p>
-            <p>
-                Highest difficulty reached:{" "}
-                <span id="stats-highest-difficulty">—</span>
-            </p>
-            <p>
-                Total sessions played:{" "}
-                <span id="stats-total-sessions">0</span>
-            </p>
-            <p>
-                Estimated training time:{" "}
-                <span id="stats-estimated-time">0m</span>
-            </p>
+            <!-- DAYS PLAYED -->
+            <div class="stat-card">
+                <div class="stat-heading">
+                    <span class="stat-icon stat-icon--calendar" aria-hidden="true"></span>
+                    <span class="stat-label">Days played</span>
+                </div>
+
+                <span class="stat-value" id="stats-days-played">0</span>
+                <span class="stat-description">Unique training days</span>
+            </div>
+
+            <!-- DAILY STREAK -->
+            <div class="stat-card">
+                <div class="stat-heading">
+                    <span class="stat-icon stat-icon--flame" aria-hidden="true"></span>
+                    <span class="stat-label">Current streak</span>
+                </div>
+
+                <span class="stat-value" id="stats-daily-streak">0</span>
+                <span class="stat-description">Consecutive days</span>
+            </div>
+
+            <!-- HIGHEST DIFFICULTY -->
+            <div class="stat-card">
+                <div class="stat-heading">
+                    <span class="stat-icon stat-icon--trophy" aria-hidden="true"></span>
+                    <span class="stat-label">Highest difficulty</span>
+                </div>
+
+                <span class="stat-value" id="stats-highest-difficulty">—</span>
+                <span class="stat-description" id="stats-highest-games">No games yet</span>
+            </div>
+
+            <!-- COMPLETED SESSIONS -->
+            <div class="stat-card">
+                <div class="stat-heading">
+                    <span class="stat-icon stat-icon--clock" aria-hidden="true"></span>
+                    <span class="stat-label">Total sessions</span>
+                </div>
+
+                <span class="stat-value" id="stats-total-sessions">0</span>
+                <span class="stat-description">
+                    Est. <span id="stats-estimated-time">0m</span>
+                </span>
+            </div>
         </div>
 
         <!-- FOOTER -->
@@ -61,6 +92,10 @@
     import { doc, getDoc } from "firebase/firestore";
 
     // ELEMENTS
+
+    const highestGamesElement = document.querySelector<HTMLSpanElement>(
+        "#stats-highest-games"
+    );
 
     const totalSessionsElement = document.querySelector<HTMLSpanElement>(
         "#stats-total-sessions"
@@ -146,7 +181,7 @@
             level?: number;
             highestLevel?: number;
         }>
-    ): string {
+    ): { level: number; gameNames: string[] } | null {
         let highest = -Infinity;
         let gameNames: string[] = [];
 
@@ -172,11 +207,12 @@
             }
         }
 
-        if (gameNames.length === 0) {
-            return "—";
-        }
+        if (gameNames.length === 0) return null;
 
-        return `${highest} — ${gameNames.join(", ")}`;
+        return {
+            level: highest,
+            gameNames,
+        };
     }
 
     // COMPLETED SESSIONS
@@ -221,6 +257,10 @@
     onAuthStateChanged(auth, async (user) => {
         if (!user) {
             closeDashboard();
+
+            if (highestGamesElement) {
+                highestGamesElement.textContent = "No games yet";
+            }
 
             if (totalSessionsElement) {
                 totalSessionsElement.textContent = "0";
@@ -270,11 +310,20 @@
             }
 
             // HIGHEST DIFFICULTY
+
             const games = data.games ?? {};
             const highestDifficulty = getHighestDifficulty(games);
 
             if (highestDifficultyElement) {
-                highestDifficultyElement.textContent = highestDifficulty;
+                highestDifficultyElement.textContent =
+                    highestDifficulty ? String(highestDifficulty.level) : "—";
+            }
+
+            if (highestGamesElement) {
+                highestGamesElement.textContent =
+                    highestDifficulty
+                        ? highestDifficulty.gameNames.join(", ")
+                        : "No games yet";
             }
 
             // COMPLETED SESSIONS AND ESTIMATED TIME
@@ -294,6 +343,10 @@
             console.error("Could not load stats:", error);
 
             if (auth.currentUser?.uid === user.uid) {
+                if (highestGamesElement) {
+                    highestGamesElement.textContent = "";
+                }
+
                 if (totalSessionsElement) {
                     totalSessionsElement.textContent = "Unavailable";
                 }
@@ -531,25 +584,109 @@
         flex: 1;
         min-height: 0;
 
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-auto-rows: min-content;
+        align-content: start;
+        gap: 10px;
+
         padding: 1rem;
         overflow-y: auto;
         overscroll-behavior: contain;
     }
 
-    .stats-section {
-        margin-bottom: 1.5rem;
-    }
+    /* STAT CARDS */
 
-    .stats-section h3 {
-        margin: 0 0 0.75rem;
-        font-size: 1rem;
-    }
+    .stat-card {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
 
-    .stats-placeholder {
-        min-height: 100px;
-        border: 2px dashed #ddd;
-        border-radius: 8px;
+        padding: 14px 12px;
+
+        border: 1px solid #e8e8e8;
+        border-radius: 14px;
         background-color: #fafafa;
+    }
+
+    .stat-heading {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        min-width: 0;
+
+        margin-bottom: 16px;
+    }
+
+    .stat-label {
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.3;
+        color: #555;
+    }
+
+    .stat-value {
+        display: block;
+        margin-bottom: 5px;
+
+        font-size: 30px;
+        font-weight: 700;
+        line-height: 1.15;
+        letter-spacing: -0.5px;
+        color: #171717;
+
+        overflow-wrap: anywhere;
+    }
+
+    .stat-description {
+        display: block;
+        margin-top: auto;
+
+        font-size: 11px;
+        line-height: 1.5;
+        color: #777;
+
+        overflow-wrap: anywhere;
+    }
+
+    /* STAT ICONS */
+
+    .stat-icon {
+        display: block;
+        width: 20px;
+        height: 20px;
+        flex-shrink: 0;
+
+        background-color: var(--theme-color, royalblue);
+
+        -webkit-mask-size: contain;
+        mask-size: contain;
+
+        -webkit-mask-position: center;
+        mask-position: center;
+
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+    }
+
+    .stat-icon--calendar {
+        -webkit-mask-image: url("/icons/stats/calendar-check.svg");
+        mask-image: url("/icons/stats/calendar-check.svg");
+    }
+
+    .stat-icon--flame {
+        -webkit-mask-image: url("/icons/stats/flame.svg");
+        mask-image: url("/icons/stats/flame.svg");
+    }
+
+    .stat-icon--trophy {
+        -webkit-mask-image: url("/icons/stats/trophy.svg");
+        mask-image: url("/icons/stats/trophy.svg");
+    }
+
+    .stat-icon--clock {
+        -webkit-mask-image: url("/icons/stats/clock.svg");
+        mask-image: url("/icons/stats/clock.svg");
     }
 
     /* FOOTER */
@@ -589,6 +726,14 @@
         .stats-header,
         .stats-content {
             padding: 1.25rem;
+        }
+    }
+
+    /* EXTRA-NARROW SCREENS */
+
+    @media (max-width: 320px) {
+        .stats-content {
+            grid-template-columns: 1fr;
         }
     }
 
