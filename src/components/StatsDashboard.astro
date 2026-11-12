@@ -32,6 +32,10 @@
         <div class="stats-content">
             <p>Days played: <span id="stats-days-played">0</span></p>
             <p>Current daily streak: <span id="stats-daily-streak">0</span></p>
+            <p>
+                Highest difficulty reached:{" "}
+                <span id="stats-highest-difficulty">—</span>
+            </p>
         </div>
 
         <!-- FOOTER -->
@@ -56,6 +60,10 @@
 
     const dailyStreakElement = document.querySelector<HTMLSpanElement>(
         "#stats-daily-streak"
+    );
+
+    const highestDifficultyElement = document.querySelector<HTMLSpanElement>(
+        "#stats-highest-difficulty"
     );
 
     const dashboard = document.querySelector<HTMLDivElement>(
@@ -117,6 +125,44 @@
         return streak;
     }
 
+    function getHighestDifficulty(
+        games: Record<string, {
+            level?: number;
+            highestLevel?: number;
+        }>
+    ): string {
+        let highest = -Infinity;
+        let gameNames: string[] = [];
+
+        for (const [slug, game] of Object.entries(games)) {
+            if (!game || typeof game !== "object") continue;
+
+            const level = game.highestLevel ?? game.level;
+
+            if (typeof level !== "number" || !Number.isFinite(level)) {
+                continue;
+            }
+
+            const gameName = slug
+                .split("-")
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(" ");
+
+            if (level > highest) {
+                highest = level;
+                gameNames = [gameName];
+            } else if (level === highest) {
+                gameNames.push(gameName);
+            }
+        }
+
+        if (gameNames.length === 0) {
+            return "—";
+        }
+
+        return `${highest} — ${gameNames.join(", ")}`;
+    }
+
     // AUTHENTICATION
 
     onAuthStateChanged(auth, async (user) => {
@@ -131,6 +177,10 @@
                 dailyStreakElement.textContent = "0";
             }
 
+            if (highestDifficultyElement) {
+                highestDifficultyElement.textContent = "—";
+            }
+
             return;
         }
 
@@ -139,7 +189,6 @@
                 doc(db, "gameSaves", user.uid)
             );
 
-            // Ignore results if the signed-in user has changed.
             if (auth.currentUser?.uid !== user.uid) return;
 
             const data = snapshot.exists() ? snapshot.data() : {};
@@ -159,6 +208,14 @@
                 dailyStreakElement.textContent = String(dailyStreak);
             }
 
+            // HIGHEST DIFFICULTY
+            const games = data.games ?? {};
+            const highestDifficulty = getHighestDifficulty(games);
+
+            if (highestDifficultyElement) {
+                highestDifficultyElement.textContent = highestDifficulty;
+            }
+
         } catch (error) {
             console.error("Could not load stats:", error);
 
@@ -169,6 +226,10 @@
 
                 if (dailyStreakElement) {
                     dailyStreakElement.textContent = "Unavailable";
+                }
+
+                if (highestDifficultyElement) {
+                    highestDifficultyElement.textContent = "Unavailable";
                 }
             }
         }

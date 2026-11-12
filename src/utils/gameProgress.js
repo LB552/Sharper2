@@ -1,5 +1,5 @@
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, runTransaction } from "firebase/firestore";
 import { auth, db } from "../firebase.js";
 import {
     DEFAULT_DIFFICULTY,
@@ -62,15 +62,50 @@ export async function saveDifficulty(gameSlug, difficulty, user) {
     }
 
     if (user) {
-        // Merge this game's entry without deleting other game saves.
-        await setDoc(
-            doc(db, "gameSaves", user.uid),
-            { games: { [gameSlug]: { level: difficulty } } },
-            { merge: true }
-        );
+        const saveRef = doc(db, "gameSaves", user.uid);
+
+        await runTransaction(db, async (transaction) => {
+            const snapshot = await transaction.get(saveRef);
+
+            const previousGame = snapshot.exists()
+                ? snapshot.data().games?.[gameSlug] ?? {}
+                : {};
+
+            const highestLevel = Math.max(
+                difficulty,
+                previousGame.level ?? difficulty,
+                previousGame.highestLevel ?? difficulty
+            );
+
+            // Merge this game's entry without deleting other game saves.
+            transaction.set(
+                saveRef,
+                {
+                    games: {
+                        [gameSlug]: {
+                            level: difficulty,
+                            highestLevel,
+                        },
+                    },
+                },
+                { merge: true }
+            );
+        });
     } else {
         const saves = readGuestSaves();
-        saves[gameSlug] = { level: difficulty };
+        const previousGame = saves[gameSlug] ?? {};
+
+        const highestLevel = Math.max(
+            difficulty,
+            previousGame.level ?? difficulty,
+            previousGame.highestLevel ?? difficulty
+        );
+
+        saves[gameSlug] = {
+            level: difficulty,
+            highestLevel,
+        };
+
         localStorage.setItem(GUEST_SAVE_KEY, JSON.stringify(saves));
     }
 }
