@@ -5,6 +5,7 @@ import Layout from '../layouts/Layout.astro';
 import MemoryGame from '../games/Memory.astro';
 import LightsGame from '../games/Lights.astro';
 import WordsGame from '../games/Words.astro';
+import CupsGame from "../games/Cups.astro";
 
 export async function getStaticPaths() {
     const games = await sanityClient.fetch(`
@@ -28,6 +29,7 @@ const GameComponent = {
     memory: MemoryGame,
     lights: LightsGame,
     words: WordsGame,
+    cups: CupsGame,
 }[game.slug];
 ---
 

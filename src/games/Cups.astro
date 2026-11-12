@@ -1,0 +1,439 @@
+---
+import GameShell from "../components/GameShell.astro";
+
+const {
+    gameTitle = "Cups",
+    gameType,
+    gameSlug,
+    unlockRequirement = 0,
+} = Astro.props;
+---
+
+<GameShell {gameTitle} {gameType} {gameSlug} {unlockRequirement} />
+
+<script>
+    import { mountGame } from "../utils/gameController.js";
+
+    mountGame(document.querySelector<HTMLElement>("#game-shell"), {
+        startRound({ board, difficulty, complete }) {
+            board.innerHTML = "";
+
+            // GAME SETTINGS
+            const ballAmount = 6;
+            const radius = 100;
+            const swaps = 5 + difficulty;
+
+            const previewDuration = 2000;
+            const pauseDuration = 500;
+            const swapDuration = 650;
+            const incorrectDuration = 1000;
+            const resetFlashDuration = 250;
+            const curveHeight = 40;
+
+            // HEXAGON POSITIONS
+            const angles = [-120, -60, 180, 0, 120, 60];
+
+            const positions = angles.map((angle) => ({
+                x: Math.cos(angle * Math.PI / 180) * radius,
+                y: Math.sin(angle * Math.PI / 180) * radius,
+            }));
+
+            const balls: HTMLButtonElement[] = [];
+
+            // Tracks which ball occupies each position.
+            let occupants: HTMLButtonElement[] = [];
+
+            let active = true;
+            let acceptingInput = false;
+            let nextNumber = 1;
+            let wins = 0;
+
+            const pendingDelays = new Map<number, () => void>();
+            const activeAnimations = new Set<Animation>();
+
+            let resolvePhase: ((won: boolean) => void) | null = null;
+
+            // UTILITIES
+
+            function wait(ms: number): Promise<void> {
+                return new Promise((resolve) => {
+                    const id = window.setTimeout(() => {
+                        pendingDelays.delete(id);
+                        resolve();
+                    }, ms);
+
+                    pendingDelays.set(id, resolve);
+                });
+            }
+
+            function setPosition(
+                ball: HTMLElement,
+                position: { x: number; y: number }
+            ) {
+                ball.style.setProperty("--x", `${position.x}px`);
+                ball.style.setProperty("--y", `${position.y}px`);
+            }
+
+            function transformAt(x: number, y: number) {
+                return `translate(
+                    calc(-50% + ${x}px),
+                    calc(-50% + ${y}px)
+                )`;
+            }
+
+            // CREATE BALLS
+
+            for (let i = 0; i < ballAmount; i++) {
+                const ball = document.createElement("button");
+
+                ball.type = "button";
+                ball.classList.add("ball");
+                ball.textContent = String(i + 1);
+                ball.disabled = true;
+                ball.setAttribute("aria-label", `Ball ${i + 1}`);
+
+                setPosition(ball, positions[i]);
+
+                board.appendChild(ball);
+                balls.push(ball);
+            }
+
+            // CURVED SWAPPING ANIMATION
+
+            function animateMovement(
+                ball: HTMLButtonElement,
+                from: { x: number; y: number },
+                to: { x: number; y: number }
+            ) {
+                const dx = to.x - from.x;
+                const dy = to.y - from.y;
+                const distance = Math.hypot(dx, dy);
+
+                // Perpendicular direction to the movement.
+                const nx = -dy / distance;
+                const ny = dx / distance;
+
+                // Calculate points along a curved path.
+                const keyframes = Array.from({ length: 17 }, (_, i) => {
+                    const t = i / 16;
+
+                    const curve = 4 * t * (1 - t) * curveHeight;
+
+                    const x = from.x + dx * t + nx * curve;
+                    const y = from.y + dy * t + ny * curve;
+
+                    return {
+                        transform: transformAt(x, y),
+                        offset: t,
+                    };
+                });
+
+                const animation = ball.animate(keyframes, {
+                    duration: swapDuration,
+                    easing: "linear",
+                    fill: "forwards",
+                });
+
+                activeAnimations.add(animation);
+
+                return animation;
+            }
+
+            async function swapBalls() {
+                if (!active) return;
+
+                // Choose two different positions.
+                const first = Math.floor(Math.random() * ballAmount);
+
+                let second = Math.floor(Math.random() * (ballAmount - 1));
+                if (second >= first) second++;
+
+                const ballA = occupants[first];
+                const ballB = occupants[second];
+
+                const animationA = animateMovement(
+                    ballA,
+                    positions[first],
+                    positions[second]
+                );
+
+                const animationB = animateMovement(
+                    ballB,
+                    positions[second],
+                    positions[first]
+                );
+
+                // Wait for both movements to finish.
+                await Promise.all([
+                    animationA.finished.catch(() => {}),
+                    animationB.finished.catch(() => {}),
+                ]);
+
+                if (!active) return;
+
+                // Save the new positions.
+                setPosition(ballA, positions[second]);
+                setPosition(ballB, positions[first]);
+
+                // Remove temporary animation effects.
+                animationA.cancel();
+                animationB.cancel();
+
+                activeAnimations.delete(animationA);
+                activeAnimations.delete(animationB);
+
+                // Update the position tracking.
+                occupants[first] = ballB;
+                occupants[second] = ballA;
+            }
+
+            // RESET BEFORE EACH PHASE
+
+            function resetBalls() {
+                occupants = [...balls];
+                nextNumber = 1;
+                acceptingInput = false;
+
+                balls.forEach((ball, index) => {
+                    setPosition(ball, positions[index]);
+
+                    ball.textContent = String(index + 1);
+                    ball.disabled = true;
+                    ball.classList.remove("revealed");
+                    ball.setAttribute("aria-label", `Ball ${index + 1}`);
+                });
+            }
+
+            // PLAYER INTERACTION
+
+            function selectBall(index: number) {
+                if (!active || !acceptingInput) return;
+
+                const ball = balls[index];
+                const number = index + 1;
+
+                // CORRECT BALL
+                if (number === nextNumber) {
+                    ball.textContent = String(number);
+                    ball.classList.add("revealed");
+                    ball.disabled = true;
+
+                    nextNumber++;
+
+                    // All six balls were found in order.
+                    if (nextNumber > ballAmount) {
+                        acceptingInput = false;
+
+                        // Keep all six numbers visible for one second.
+                        void (async () => {
+                            await wait(1000);
+
+                            if (!active) return;
+
+                            resolvePhase?.(true);
+                            resolvePhase = null;
+                        })();
+                    }
+
+                    return;
+                }
+
+                // INCORRECT BALL
+                acceptingInput = false;
+
+                // Reveal every ball.
+                balls.forEach((item, i) => {
+                    item.textContent = String(i + 1);
+                    item.disabled = true;
+                });
+
+                // Give the player one second to see the answer.
+                void (async () => {
+                    await wait(incorrectDuration);
+
+                    if (!active) return;
+
+                    resolvePhase?.(false);
+                    resolvePhase = null;
+                })();
+            }
+
+            const clickHandlers = balls.map((ball, index) => {
+                const handler = () => selectBall(index);
+                ball.addEventListener("click", handler);
+                return handler;
+            });
+
+            // PLAY ONE PHASE
+
+            async function playPhase(): Promise<boolean | null> {
+                if (!active) return null;
+
+            // Return balls to their default positions.
+            resetBalls();
+
+            // Briefly hide the numbers to signal a new phase.
+            balls.forEach((ball) => {
+                ball.textContent = "";
+            });
+
+            // Keep the balls blank for 250 ms.
+            await wait(resetFlashDuration);
+            if (!active) return null;
+
+            // Reveal the numbers again.
+            balls.forEach((ball, index) => {
+                ball.textContent = String(index + 1);
+            });
+
+            // Show numbers for two seconds.
+            await wait(previewDuration);
+            if (!active) return null;
+
+                // Hide all numbers.
+                balls.forEach((ball) => {
+                    ball.textContent = "";
+                });
+
+                // Pause before the first swap.
+                await wait(pauseDuration);
+                if (!active) return null;
+
+                // Perform the swaps.
+                for (let i = 0; i < swaps; i++) {
+                    await swapBalls();
+                    if (!active) return null;
+
+                    // Pause after every swap,
+                    // including the final swap.
+                    await wait(pauseDuration);
+                    if (!active) return null;
+                }
+
+                // Enable interactivity.
+                acceptingInput = true;
+
+                balls.forEach((ball) => {
+                    ball.disabled = false;
+                });
+
+                // Wait until the player wins or makes a mistake.
+                return new Promise<boolean>((resolve) => {
+                    resolvePhase = resolve;
+                });
+            }
+
+            // PLAY TWO PHASES PER ROUND
+
+            async function playRound() {
+                for (let phase = 0; phase < 2; phase++) {
+                    const won = await playPhase();
+
+                    if (!active || won === null) return;
+
+                    if (won) wins++;
+                }
+
+                if (!active) return;
+
+                // Report the two-phase result.
+                complete({ wins });
+            }
+
+            // START GAMEPLAY
+
+            void playRound();
+
+            // CLEANUP
+
+            return () => {
+                active = false;
+                acceptingInput = false;
+
+                // Stop pending delays.
+                for (const [id, resolve] of pendingDelays) {
+                    clearTimeout(id);
+                    resolve();
+                }
+
+                pendingDelays.clear();
+
+                // Stop active animations.
+                for (const animation of activeAnimations) {
+                    animation.cancel();
+                }
+
+                activeAnimations.clear();
+
+                // Release the phase promise if gameplay is stopped.
+                resolvePhase?.(false);
+                resolvePhase = null;
+
+                // Remove event listeners.
+                balls.forEach((ball, index) => {
+                    ball.removeEventListener("click", clickHandlers[index]);
+                });
+            };
+        },
+    });
+</script>
+
+<style>
+    :global(#game-board) {
+        position: relative;
+        width: min(100%, 320px);
+        aspect-ratio: 1;
+        margin: 0 auto;
+    }
+
+    :global(#game-board .ball) {
+        position: absolute;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+
+        width: 50px;
+        height: 50px;
+        box-sizing: border-box;
+        border-radius: 50%;
+
+        border: 2px solid var(--theme-color, royalblue);
+        background-color: white;
+        color: #222;
+
+        font-family: inherit;
+        font-size: 1.25rem;
+
+        left: 50%;
+        top: 50%;
+
+        transform: translate(
+            calc(-50% + var(--x)),
+            calc(-50% + var(--y))
+        );
+
+        /* Movement is handled by the Web Animations API. */
+        transition: none;
+
+        cursor: pointer;
+        touch-action: manipulation;
+    }
+
+    :global(#game-board .ball:disabled) {
+        cursor: default;
+        opacity: 1;
+    }
+
+    :global(#game-board .ball:not(:disabled):hover) {
+        background-color: #f0f3ff;
+    }
+
+    :global(#game-board .ball:focus-visible) {
+        outline: 3px solid var(--theme-color, royalblue);
+        outline-offset: 3px;
+    }
+
+    :global(#game-board .ball.revealed) {
+        background-color: #eaf0ff;
+    }
+</style>
