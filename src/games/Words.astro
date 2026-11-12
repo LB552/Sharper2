@@ -1,0 +1,174 @@
+---
+import GameShell from "../components/GameShell.astro";
+
+const {
+    gameTitle = "Words",
+    gameType,
+    gameSlug,
+    unlockRequirement = 0,
+} = Astro.props;
+---
+
+<GameShell {gameTitle} {gameType} {gameSlug} {unlockRequirement} />
+
+<script>
+    import { mountGame } from "../utils/gameController.js";
+
+    const wordPool = [
+        "apple", "bread", "chair", "clock", "cloud",
+        "dance", "dream", "drink", "earth", "field",
+        "flame", "floor", "fruit", "glass", "grass",
+        "green", "heart", "horse", "house", "light",
+        "money", "month", "mouse", "music", "night",
+        "ocean", "paper", "party", "peace", "phone",
+        "plant", "plate", "point", "queen", "quick",
+        "quiet", "radio", "river", "round", "shirt",
+        "shoes", "short", "sleep", "small", "smile",
+        "snake", "sound", "space", "spoon", "sport",
+        "stand", "stone", "store", "storm", "story",
+        "sugar", "sweet", "table", "teach", "thank",
+        "their", "there", "thing", "think", "three",
+        "throw", "tiger", "today", "tooth", "touch",
+        "tower", "train", "tree", "truck", "trust",
+        "under", "value", "video", "visit", "voice",
+        "watch", "water", "wheel", "white", "whole",
+        "woman", "world", "write", "wrong", "young",
+        "about", "above", "after", "again", "alone",
+        "along", "anger", "beach", "black", "blue"
+    ];
+
+    mountGame(document.querySelector<HTMLElement>("#game-shell"), {
+        startRound({ board, difficulty, complete }) {
+            board.innerHTML = "";
+
+            // Create the word display.
+            const wordDisplay = document.createElement("p");
+            board.appendChild(wordDisplay);
+
+            // Create the input field.
+            const wordInput = document.createElement("input");
+            wordInput.type = "text";
+            wordInput.autocomplete = "off";
+            wordInput.spellcheck = false;
+            wordInput.disabled = true;
+            board.appendChild(wordInput);
+
+            // Select random words without duplicates.
+            function getRandomWords(words: string[], count: number) {
+                const shuffled = [...words];
+
+                for (let i = shuffled.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                }
+
+                return shuffled.slice(0, count);
+            }
+
+            const roundWordCount = Math.min(wordPool.length, 15 + difficulty);
+            const roundWords = getRandomWords(wordPool, roundWordCount);
+
+            const back = Math.min(3 + difficulty * 2, roundWords.length);
+
+            let active = true;
+            let currentWordIndex = 0;
+            let timeout: ReturnType<typeof setTimeout> | null = null;
+
+            // STAGE 1: MEMORIZATION
+
+            function showPreviewWord(index: number) {
+                if (!active) return;
+
+                // All preview words have been shown.
+                if (index >= back) {
+                    startRecall();
+                    return;
+                }
+
+                // Show the current word.
+                wordDisplay.textContent = roundWords[index];
+
+                // Keep it visible for 1 second.
+                timeout = setTimeout(() => {
+                    if (!active) return;
+
+                    // Hide the word.
+                    wordDisplay.textContent = "";
+
+                    // Wait 0.5 seconds before continuing.
+                    timeout = setTimeout(() => {
+                        showPreviewWord(index + 1);
+                    }, 500);
+                }, 1000);
+            }
+
+            // STAGE 2: RECALL
+
+            function startRecall() {
+                if (!active) return;
+
+                // Display the word that follows the preview.
+                wordDisplay.textContent = roundWords[back] ?? "";
+
+                // Enable typing.
+                wordInput.disabled = false;
+                wordInput.focus();
+            }
+
+            function checkInput() {
+                if (!active) return;
+
+                const answer = wordInput.value.trim().toLowerCase();
+                const correctWord = roundWords[currentWordIndex];
+
+                if (answer !== correctWord) return;
+
+                // Correct answer!
+                currentWordIndex++;
+
+                // Clear the input for the next word.
+                wordInput.value = "";
+
+                // Check whether all words have been recalled.
+                if (currentWordIndex >= roundWords.length) {
+                    active = false;
+                    wordInput.disabled = true;
+                    wordDisplay.textContent = "";
+
+                    complete({
+                        goodPoints: roundWords.length,
+                        badPoints: 0,
+                        percentage: 100,
+                    });
+
+                    return;
+                }
+
+                // Advance the displayed word.
+                // If there are no more words, display nothing.
+                wordDisplay.textContent =
+                    roundWords[currentWordIndex + back] ?? "";
+            }
+
+            wordInput.addEventListener("input", checkInput);
+
+            // Start the memorization stage immediately.
+            showPreviewWord(0);
+
+            // Cleanup when the round ends.
+            return () => {
+                active = false;
+
+                if (timeout !== null) {
+                    clearTimeout(timeout);
+                }
+
+                wordInput.removeEventListener("input", checkInput);
+            };
+        },
+    });
+</script>
+
+<style>
+    /* WORDS GAMEPLAY STYLING */
+</style>
