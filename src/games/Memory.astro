@@ -99,8 +99,8 @@ const { gameTitle = "Memory", gameType, gameSlug, unlockRequirement = 0 } = Astr
                         if (!active) return;
                         previousCard.classList.remove("flipped");
                         card.classList.remove("flipped");
-                        previousCard.textContent = "?";
-                        card.textContent = "?";
+                        previousCard.textContent = "";
+                        card.textContent = "";
                         resetTurn();
                     }, 1000);
                     timeouts.add(id);
@@ -111,7 +111,7 @@ const { gameTitle = "Memory", gameType, gameSlug, unlockRequirement = 0 } = Astr
             cards.forEach((number, index) => {
                 const card = document.createElement("div");
                 card.classList.add("card");
-                card.textContent = "?";
+                card.textContent = "";
                 card.addEventListener("click", () => flipCard(card, index, number));
                 board.appendChild(card);
             });
