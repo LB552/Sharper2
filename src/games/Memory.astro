@@ -35,7 +35,7 @@ const {
                 if (!demoDialog.open) demoDialog.showModal();
             },
         },
-        startRound({ board, difficulty, complete }) {
+        startRound({ board, difficulty, complete, addPoint }) {
             const cardAmount = 10 + difficulty * 2;
             const cards: number[] = [];
             for (let i = 1; i <= cardAmount / 2; i++) cards.push(i, i);
@@ -83,6 +83,7 @@ const {
                 const previousIndex = firstIndex!;
                 if (cards[previousIndex] === cards[index]) {
                     goodPoints++;
+                    addPoint(true);
                     previousCard.classList.add("matched");
                     card.classList.add("matched");
                     matchedPairs++;
@@ -99,7 +100,10 @@ const {
                         });
                     }
                 } else {
-                    if (firstWasSeen || wasSeen) badPoints++;
+                    if (firstWasSeen || wasSeen) {
+                            badPoints++;
+                            addPoint(false);
+                        }
                     const id = setTimeout(() => {
                         timeouts.delete(id);
                         if (!active) return;

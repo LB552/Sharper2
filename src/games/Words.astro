@@ -43,7 +43,7 @@ const {
     ];
 
     mountGame(document.querySelector<HTMLElement>("#game-shell"), {
-        startRound({ board, difficulty, complete }) {
+        startRound({ board, difficulty, complete, addPoint }) {
             board.innerHTML = "";
 
             // Create the word display.
@@ -158,6 +158,7 @@ const {
 
                 // Correct answer: award a good point.
                 goodPoints++;
+                addPoint(true);
                 advanceWord();
             }
 
@@ -166,6 +167,7 @@ const {
 
                 // Skipped word: award a bad point.
                 badPoints++;
+                addPoint(false);
                 advanceWord();
             }
 

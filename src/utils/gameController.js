@@ -9,7 +9,7 @@ import {
     recordCompletedSession,
 } from "./daysPlayed.js";
 
-const ROUND_DELAY_MS = 1000;
+const ROUND_DELAY_MS = 3000;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
@@ -38,12 +38,16 @@ export function mountGame(root, { startRound, demo = null }) {
     const lockedTitle = root.querySelector("#locked-title");
     const lockedDescription = root.querySelector("#locked-description");
     const lockedSignup = root.querySelector("#locked-signup");
+    const levelFeedback = root.querySelector("#game-level-feedback");
+    const pointSymbols = root.querySelector("#game-point-symbols");
+    const levelResult = root.querySelector("#game-level-result");
 
     const { gameTitle = "this game", gameType = "", gameSlug = "" } = root.dataset;
     const unlockRequirement = Number(root.dataset.unlockRequirement ?? 0);
 
     let user = null;
     let difficulty = DEFAULT_DIFFICULTY;
+    let roundDifficulty = DEFAULT_DIFFICULTY;
     let dailyTimer = null;
     let dailyLocked = false;
     let roundWindow = null;
@@ -56,6 +60,43 @@ export function mountGame(root, { startRound, demo = null }) {
     let roundCleanup = null;
     let roundToken = 0;
     let disposed = false;
+
+    function resetLevelFeedback() {
+        pointSymbols.replaceChildren();
+        levelResult.textContent = "";
+        levelFeedback.hidden = gameType !== "percentage";
+    }
+
+    function addPoint(good) {
+        if (gameType !== "percentage") return;
+
+        const symbol = document.createElement("span");
+
+        symbol.textContent = good ? "✓" : "✗";
+        symbol.className = good ? "good-point" : "bad-point";
+
+        pointSymbols.appendChild(symbol);
+    }
+
+    function showLevelResult(result, previousDifficulty, nextDifficulty) {
+        if (gameType !== "percentage") return;
+
+        const percentage = Number(result.percentage);
+
+        if (!Number.isFinite(percentage)) {
+            console.error("Percentage game returned an invalid percentage:", result);
+            return;
+        }
+
+        const outcome =
+            nextDifficulty > previousDifficulty
+                ? "Increase level"
+                : nextDifficulty < previousDifficulty
+                    ? "Decrease level"
+                    : "Keep level";
+
+        levelResult.textContent = `${Math.round(percentage)}% → ${outcome}`;
+    }
 
     function cleanupRound() {
         roundToken++;
@@ -114,6 +155,7 @@ export function mountGame(root, { startRound, demo = null }) {
             roundWindow = window;
             roundStartedAt = Date.now();
             roundCompletedAt = null;
+            roundDifficulty = difficulty;
             pendingResult = null;
             progressSaved = false;
             dailyLocked = false;
@@ -123,11 +165,21 @@ export function mountGame(root, { startRound, demo = null }) {
             timerLabel.hidden = false;
             retryButton.hidden = true;
             status.textContent = "";
+            resetLevelFeedback();
 
             const token = roundToken;
             const cleanup = startRound({
                 board,
                 difficulty,
+                addPoint(good) {
+                    if (
+                        disposed ||
+                        token !== roundToken ||
+                        pendingResult !== null
+                    ) return;
+
+                    addPoint(good);
+                },
                 complete(result) {
                     if (disposed || token !== roundToken || pendingResult !== null) return;
                     roundCompletedAt = Date.now();
@@ -148,6 +200,7 @@ export function mountGame(root, { startRound, demo = null }) {
         status.textContent = "Saving progress...";
 
         try {
+            const previousDifficulty = difficulty;
             const next = handleLevel(gameType, difficulty, pendingResult).difficulty;
             if (!progressSaved) {
                 await saveDifficulty(gameSlug, next, user);
@@ -186,10 +239,19 @@ export function mountGame(root, { startRound, demo = null }) {
             return;
         }
 
+
         if (!user) demo?.recordRound();
+
+        showLevelResult(
+            pendingResult,
+            roundDifficulty,
+            difficulty
+        );
+
         pendingResult = null;
         cleanupRound();
-        status.textContent = `Round complete. Difficulty: ${difficulty}.`;
+
+        status.textContent = "";
         if (!user && demo?.hasReachedLimit()) {
             saving = false;
             showDemoLimit();

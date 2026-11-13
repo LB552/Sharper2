@@ -11,6 +11,11 @@ const { gameTitle, gameType, gameSlug, unlockRequirement = 0 } = Astro.props;
 >
     <div id="game-board" hidden></div>
 
+    <div id="game-level-feedback" hidden>
+        <p id="game-points">Points: <span id="game-point-symbols"></span></p>
+        <p id="game-level-result" aria-live="polite"></p>
+    </div>
+
     <div id="locked-game" hidden>
         <h2 id="locked-title">Unlock {gameTitle}</h2>
         <p id="locked-description"></p>
@@ -33,9 +38,61 @@ const { gameTitle, gameType, gameSlug, unlockRequirement = 0 } = Astro.props;
 </div>
 
 <style>
-    #game-shell [hidden] { display: none !important; }
-    #daily-timer { font-variant-numeric: tabular-nums; font-weight: bold; }
-    #daily-limit-message { text-align: center; padding: 1rem; }
-    #locked-game { text-align: center; }
-    #locked-game a { color: var(--theme-color); font-weight: bold; }
+    #game-shell [hidden] {
+        display: none !important;
+    }
+
+    #game-level-feedback {
+        text-align: center;
+        margin: 1rem 0;
+    }
+
+    #game-points {
+        margin: 0;
+        font-weight: 600;
+    }
+
+    #game-point-symbols {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+        vertical-align: middle;
+    }
+
+    #game-point-symbols .good-point {
+        color: green;
+    }
+
+    #game-point-symbols .bad-point {
+        color: crimson;
+    }
+
+    #game-level-result {
+        margin: 0.5rem 0 0;
+        font-weight: bold;
+        color: var(--theme-color);
+    }
+
+    #game-level-result:empty {
+        display: none;
+    }
+
+    #daily-timer {
+        font-variant-numeric: tabular-nums;
+        font-weight: bold;
+    }
+
+    #daily-limit-message {
+        text-align: center;
+        padding: 1rem;
+    }
+
+    #locked-game {
+        text-align: center;
+    }
+
+    #locked-game a {
+        color: var(--theme-color);
+        font-weight: bold;
+    }
 </style>
