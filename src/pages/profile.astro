@@ -1,113 +1,134 @@
-<h1>Profile</h1>
+---
+import Layout from "../layouts/Layout.astro";
+import "../styles/forms.css";
+---
 
-<p id="profile-message" role="status" aria-live="polite">
-    Loading profile...
-</p>
+<Layout>
+    <main class="form-page">
+        <h1>Profile</h1>
 
-<div id="profile-content" hidden>
-    <!-- USERNAME -->
-    <section>
-        <h2>Change username</h2>
+        <p id="profile-message" role="status" aria-live="polite">
+            Loading profile...
+        </p>
 
-        <p>Current username: <span id="current-username"></span></p>
+        <div id="profile-content" class="form-grid" hidden>
+            <!-- USERNAME -->
+            <section class="form-card">
+                <h2>Change username</h2>
 
-        <form id="username-form">
-            <input
-                type="text"
-                id="new-username"
-                placeholder="New username"
-                autocomplete="off"
-                minlength="3"
-                maxlength="20"
-                pattern="[A-Za-z0-9_]+"
-                title="Use 3–20 letters, numbers, or underscores."
-                required
-            >
+                <p class="current-value">
+                    Current username:{" "}
+                    <span id="current-username"></span>
+                </p>
 
-            <input
-                type="text"
-                id="confirm-username"
-                placeholder="Repeat new username"
-                autocomplete="off"
-                minlength="3"
-                maxlength="20"
-                pattern="[A-Za-z0-9_]+"
-                required
-            >
+                <form id="username-form">
+                    <input
+                        type="text"
+                        id="new-username"
+                        placeholder="New username"
+                        aria-label="New username"
+                        autocomplete="off"
+                        minlength="3"
+                        maxlength="20"
+                        pattern="[A-Za-z0-9_]+"
+                        title="Use 3–20 letters, numbers, or underscores."
+                        required
+                    >
 
-            <button type="submit">Change username</button>
+                    <input
+                        type="text"
+                        id="confirm-username"
+                        placeholder="Repeat new username"
+                        aria-label="Repeat new username"
+                        autocomplete="off"
+                        minlength="3"
+                        maxlength="20"
+                        pattern="[A-Za-z0-9_]+"
+                        required
+                    >
 
-            <p id="username-message" role="status" aria-live="polite"></p>
-        </form>
-    </section>
+                    <button type="submit">Change username</button>
 
-    <!-- EMAIL -->
-    <section>
-        <h2>Change email</h2>
+                    <p id="username-message" role="status" aria-live="polite"></p>
+                </form>
+            </section>
 
-        <p>Current email: <span id="current-email"></span></p>
+            <!-- EMAIL -->
+            <section class="form-card">
+                <h2>Change email</h2>
 
-        <form id="email-form">
-            <input
-                type="email"
-                id="new-email"
-                placeholder="New email"
-                autocomplete="new-email"
-                required
-            >
+                <p class="current-value">
+                    Current email:{" "}
+                    <span id="current-email"></span>
+                </p>
 
-            <input
-                type="email"
-                id="confirm-email"
-                placeholder="Repeat new email"
-                autocomplete="off"
-                required
-            >
+                <form id="email-form">
+                    <input
+                        type="email"
+                        id="new-email"
+                        placeholder="New email"
+                        aria-label="New email"
+                        autocomplete="email"
+                        required
+                    >
 
+                    <input
+                        type="email"
+                        id="confirm-email"
+                        placeholder="Repeat new email"
+                        aria-label="Repeat new email"
+                        autocomplete="off"
+                        required
+                    >
 
-            <button type="submit">Change email</button>
+                    <button type="submit">Change email</button>
 
-            <p id="email-message" role="status" aria-live="polite"></p>
-        </form>
-    </section>
+                    <p id="email-message" role="status" aria-live="polite"></p>
+                </form>
+            </section>
 
-    <!-- PASSWORD -->
-    <section>
-        <h2>Change password</h2>
+            <!-- PASSWORD -->
+            <section class="form-card">
+                <h2>Change password</h2>
 
-        <form id="password-form">
-            <input
-                type="password"
-                id="current-password"
-                placeholder="Current password"
-                autocomplete="current-password"
-                required
-            >
+                <form id="password-form">
+                    <input
+                        type="password"
+                        id="current-password"
+                        placeholder="Current password"
+                        aria-label="Current password"
+                        autocomplete="current-password"
+                        required
+                    >
 
-            <input
-                type="password"
-                id="new-password"
-                placeholder="New password"
-                autocomplete="new-password"
-                minlength="6"
-                required
-            >
+                    <input
+                        type="password"
+                        id="new-password"
+                        placeholder="New password"
+                        aria-label="New password"
+                        autocomplete="new-password"
+                        minlength="6"
+                        required
+                    >
 
-            <input
-                type="password"
-                id="confirm-password"
-                placeholder="Repeat new password"
-                autocomplete="new-password"
-                minlength="6"
-                required
-            >
+                    <input
+                        type="password"
+                        id="confirm-password"
+                        placeholder="Repeat new password"
+                        aria-label="Repeat new password"
+                        autocomplete="new-password"
+                        minlength="6"
+                        required
+                    >
 
-            <button type="submit">Change password</button>
+                    <button type="submit">Change password</button>
 
-            <p id="password-message" role="status" aria-live="polite"></p>
-        </form>
-    </section>
-</div>
+                    <p id="password-message" role="status" aria-live="polite"></p>
+                </form>
+            </section>
+        </div>
+    </main>
+</Layout>
 
 <script>
     import { auth, db } from "../firebase.js";
@@ -427,3 +448,15 @@
         }
     });
 </script>
+
+<style>
+    @media (min-width: 1000px) {
+        .form-page {
+            max-width: 1100px;
+        }
+
+        .form-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+</style>

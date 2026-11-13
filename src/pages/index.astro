@@ -121,18 +121,22 @@ const games = await sanityClient.fetch(`
 
 <style>
     h1 {
-        margin-bottom: 2rem;
+        margin-bottom: calc(var(--spacing-unit) * 2);
         text-align: center;
         color: var(--theme-color);
+        font-size: 1.75rem;
     }
 
     .game-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 1rem;
+        gap: var(--spacing-unit);
         max-width: 1100px;
         margin: 0 auto;
-        padding: 0 1rem 3rem;
+        padding:
+            0
+            var(--spacing-unit)
+            calc(var(--spacing-unit) * 3);
     }
 
     .game-grid:not([data-ready]) {
@@ -145,9 +149,9 @@ const games = await sanityClient.fetch(`
         min-width: 0;
         overflow: hidden;
         border: 2px solid transparent;
-        border-radius: 14px;
-        background: #f5f6fa;
-        color: #222;
+        border-radius: var(--border-radius);
+        background: var(--surface-color);
+        color: var(--text-color);
         text-decoration: none;
         transition: transform 0.2s ease, border-color 0.2s ease;
     }
@@ -177,27 +181,28 @@ const games = await sanityClient.fetch(`
         display: flex;
         flex: 1;
         flex-direction: column;
-        gap: 0.5rem;
-        padding: 1rem;
+        gap: calc(var(--spacing-unit) * 0.5);
+        padding: var(--spacing-unit);
     }
 
     .game-info h3 {
         margin: 0;
         color: var(--theme-color);
-        font-size: 1.125rem;
+        font-size: 1.25rem;
     }
 
     .game-info p {
         margin: 0;
-        color: #666;
-        font-size: 0.875rem;
+        color: var(--muted-text-color);
+        font-size: 1rem;
         line-height: 1.5;
     }
 
     .game-info .game-difficulty,
     .game-info .unlock-requirement {
         margin-top: auto;
-        padding-top: 0.75rem;
+        padding-top: calc(var(--spacing-unit) * 0.75);
+        font-size: 0.875rem;
         font-weight: 600;
         color: var(--theme-color);
     }
@@ -209,21 +214,26 @@ const games = await sanityClient.fetch(`
     @media (min-width: 600px) {
         .game-grid {
             grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 1.25rem;
-            padding-inline: 1.5rem;
+            gap: calc(var(--spacing-unit) * 1.25);
+            padding-inline: calc(var(--spacing-unit) * 1.5);
         }
     }
 
     @media (min-width: 900px) {
         .game-grid {
             grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 1.5rem;
-            padding-inline: 2rem;
+            gap: calc(var(--spacing-unit) * 1.5);
+            padding-inline: calc(var(--spacing-unit) * 2);
         }
     }
 
     @media (prefers-reduced-motion: reduce) {
-        .game-card { transition: none; }
-        .game-card[href]:hover { transform: none; }
+        .game-card {
+            transition: none;
+        }
+
+        .game-card[href]:hover {
+            transform: none;
+        }
     }
 </style>

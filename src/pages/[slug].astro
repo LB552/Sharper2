@@ -34,21 +34,57 @@ const GameComponent = {
 ---
 
 <Layout title={game.title}>
-    <h1>{game.title}</h1>
-    <p>{game.description}</p>
+    <main class="game-page">
+        <header class="game-intro">
+            <h1>{game.title}</h1>
+            {game.description && <p>{game.description}</p>}
+        </header>
 
-    <section class="game-window">
-        {GameComponent && <GameComponent gameTitle={game.title} gameType={game.gameType} gameSlug={game.slug} unlockRequirement={game.unlockRequirement ?? 0} />}
-    </section>
+        <section class="game-window" aria-label={`${game.title} gameplay`}>
+            {GameComponent && (
+                <GameComponent
+                    gameTitle={game.title}
+                    gameType={game.gameType}
+                    gameSlug={game.slug}
+                    unlockRequirement={game.unlockRequirement ?? 0}
+                />
+            )}
+        </section>
+    </main>
 </Layout>
 
 <style>
+    .game-page {
+        width: min(100% - 2 * var(--spacing-unit), 900px);
+        margin: 0 auto;
+        padding: calc(var(--spacing-unit) * 2) 0
+                 calc(var(--spacing-unit) * 3);
+    }
+
+    .game-intro {
+        text-align: center;
+        margin-bottom: calc(var(--spacing-unit) * 2);
+    }
+
+    .game-intro h1 {
+        margin: 0 0 var(--spacing-unit);
+        color: var(--theme-color);
+        font-size: 1.75rem;
+    }
+
+    .game-intro p {
+        max-width: 700px;
+        margin: 0 auto;
+        color: var(--muted-text-color);
+        font-size: 1rem;
+        line-height: 1.6;
+    }
+
     .game-window {
-        width: 90%;
-        margin-top: 1rem;
-        margin-inline: auto;
-        padding: 1rem;
-        border-radius: 12px;
+        width: 100%;
+        box-sizing: border-box;
+        padding: var(--spacing-unit);
+        border-radius: var(--border-radius);
         background: darkgrey;
     }
 </style>

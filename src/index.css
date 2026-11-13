@@ -2,7 +2,15 @@
 
 :root {
     --default-font: "Huninn", sans-serif;
-    --theme-color: goldenrod;
+
+    --theme-color: royalblue;
+    --background-color: #fff;
+    --surface-color: #f5f6fa;
+    --text-color: #222;
+    --muted-text-color: #666;
+
+    --border-radius: 14px;
+    --spacing-unit: 1rem;
 }
 
 html,

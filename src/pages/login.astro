@@ -1,83 +1,97 @@
-<h1>Login / Register</h1>
+---
+import Layout from "../layouts/Layout.astro";
+import "../styles/forms.css";
+---
 
-<!-- LOGIN -->
-<section>
-    <h2>Login</h2>
+<Layout>
+    <main class="form-page">
+        <h1>Login / Register</h1>
 
-    <form id="login-form">
-        <input
-            type="email"
-            id="login-email"
-            placeholder="Email"
-            autocomplete="email"
-            required
-        >
+        <div class="form-grid">
+            <!-- LOGIN -->
+            <section class="form-card">
+                <h2>Log in</h2>
 
-        <input
-            type="password"
-            id="login-password"
-            placeholder="Password"
-            autocomplete="current-password"
-            required
-        >
+                <form id="login-form">
+                    <input
+                        type="email"
+                        id="login-email"
+                        placeholder="Email"
+                        aria-label="Email"
+                        autocomplete="email"
+                        required
+                    >
 
-        <button type="submit">Log in</button>
+                    <input
+                        type="password"
+                        id="login-password"
+                        placeholder="Password"
+                        aria-label="Password"
+                        autocomplete="current-password"
+                        required
+                    >
 
-        <p id="login-message" role="status" aria-live="polite"></p>
-    </form>
-</section>
+                    <button type="submit">Log in</button>
 
+                    <p id="login-message" role="status" aria-live="polite"></p>
+                </form>
+            </section>
 
-<!-- REGISTRATION -->
-<section>
-    <h2>Register</h2>
+            <!-- REGISTRATION -->
+            <section class="form-card">
+                <h2>Create account</h2>
 
-    <form id="register-form">
+                <form id="register-form">
+                    <input
+                        type="email"
+                        id="register-email"
+                        placeholder="Email"
+                        aria-label="Email"
+                        autocomplete="email"
+                        required
+                    >
 
-        <input
-            type="email"
-            id="register-email"
-            placeholder="Email"
-            autocomplete="email"
-            required
-        >
+                    <input
+                        type="password"
+                        id="register-password"
+                        placeholder="Password"
+                        aria-label="Password"
+                        autocomplete="new-password"
+                        minlength="6"
+                        required
+                    >
 
-        <input
-            type="password"
-            id="register-password"
-            placeholder="Password"
-            autocomplete="new-password"
-            minlength="6"
-            required
-        >
+                    <input
+                        type="password"
+                        id="confirm-password"
+                        placeholder="Repeat password"
+                        aria-label="Repeat password"
+                        autocomplete="new-password"
+                        minlength="6"
+                        required
+                    >
 
-        <input
-            type="password"
-            id="confirm-password"
-            placeholder="Repeat password"
-            autocomplete="new-password"
-            minlength="6"
-            required
-        >
+                    <input
+                        type="text"
+                        id="register-username"
+                        placeholder="Username"
+                        aria-label="Username"
+                        autocomplete="username"
+                        minlength="3"
+                        maxlength="20"
+                        pattern="[A-Za-z0-9_]+"
+                        title="Use 3–20 letters, numbers, or underscores."
+                        required
+                    >
 
-        <input
-            type="text"
-            id="register-username"
-            placeholder="Username"
-            autocomplete="username"
-            minlength="3"
-            maxlength="20"
-            pattern="[A-Za-z0-9_]+"
-            title="Use 3–20 letters, numbers, or underscores."
-            required
-        >
+                    <button type="submit">Create account</button>
 
-        <button type="submit">Create Account</button>
-
-        <p id="register-message" role="status" aria-live="polite"></p>
-
-    </form>
-</section>
+                    <p id="register-message" role="status" aria-live="polite"></p>
+                </form>
+            </section>
+        </div>
+    </main>
+</Layout>
 
 <script>
     import {
