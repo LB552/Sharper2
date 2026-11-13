@@ -9,6 +9,13 @@ const { gameTitle, gameType, gameSlug, unlockRequirement = 0 } = Astro.props;
     data-game-slug={gameSlug}
     data-unlock-requirement={unlockRequirement}
 >
+    
+    <div id="game-start-screen" hidden>
+        <h2>Ready to play?</h2>
+        <p>Your five-minute daily timer starts when you press Start.</p>
+        <button id="game-start-button" type="button">Start</button>
+    </div>
+
     <div id="game-board" hidden></div>
 
     <div id="game-level-feedback" hidden>
@@ -134,5 +141,41 @@ const { gameTitle, gameType, gameSlug, unlockRequirement = 0 } = Astro.props;
 
     #game-wins-result:empty {
         display: none;
+    }
+
+    #game-start-screen {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        min-height: 250px;
+        padding: 2rem 1rem;
+        text-align: center;
+    }
+
+    #game-start-screen h2,
+    #game-start-screen p {
+        margin: 0;
+    }
+
+    #game-start-button {
+        padding: 0.75rem 2.5rem;
+        border: none;
+        border-radius: 10px;
+        background: var(--theme-color, royalblue);
+        color: white;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    #game-start-button:hover {
+        filter: brightness(0.9);
+    }
+
+    #game-start-button:focus-visible {
+        outline: 3px solid var(--theme-color, royalblue);
+        outline-offset: 3px;
     }
 </style>

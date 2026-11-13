@@ -30,6 +30,8 @@ export function mountGame(root, { startRound, demo = null }) {
     if (!root) throw new Error("Game shell was not found");
 
     const board = root.querySelector("#game-board");
+    const startScreen = root.querySelector("#game-start-screen");
+    const startButton = root.querySelector("#game-start-button");
     const status = root.querySelector("#game-status");
     const retryButton = root.querySelector("#retry-button");
     const timerLabel = root.querySelector("#daily-timer");
@@ -65,6 +67,8 @@ export function mountGame(root, { startRound, demo = null }) {
     let roundToken = 0;
     let disposed = false;
     let completedPhases = 0;
+    let readyToStart = false;
+    let launching = false;
 
     function resetLevelFeedback() {
         // Percentage games
@@ -305,7 +309,7 @@ export function mountGame(root, { startRound, demo = null }) {
             roundDifficulty,
             difficulty
         );
-        
+
         showTwoPhaseResult(
             pendingResult,
             roundDifficulty,
@@ -330,9 +334,57 @@ export function mountGame(root, { startRound, demo = null }) {
         }
     }
 
+    function getStartStorageKey() {
+        const date = new Intl.DateTimeFormat("sv-SE", {
+            timeZone: "Europe/Stockholm",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+        }).format(new Date());
+
+        return `sharper-start:${user?.uid ?? "guest"}:${gameSlug}:${date}`;
+    }
+
+    async function startGame() {
+        if (!readyToStart || launching || disposed) return;
+
+        launching = true;
+        readyToStart = false;
+        startButton.disabled = true;
+        startScreen.hidden = true;
+
+        const storageKey = getStartStorageKey();
+        const alreadyStarted = localStorage.getItem(storageKey) === "true";
+
+        // Remember the click immediately, even if the player leaves the page.
+        localStorage.setItem(storageKey, "true");
+
+        try {
+            await dailyTimer.start();
+
+            if (disposed) return;
+
+            await startNextRound();
+        } catch (error) {
+            // Allow a first attempt to be retried if starting failed.
+            if (!alreadyStarted) {
+                localStorage.removeItem(storageKey);
+            }
+
+            reportTimerError(error);
+        } finally {
+            launching = false;
+            startButton.disabled = false;
+        }
+    }
+
     async function initialize() {
         if (disposed) return;
         retryButton.hidden = true;
+        startScreen.hidden = true;
+        readyToStart = false;
+        board.hidden = true;
+        timerLabel.hidden = true;
         status.textContent = "Loading progress...";
         try {
             user = await waitForAuth();
@@ -369,10 +421,19 @@ export function mountGame(root, { startRound, demo = null }) {
                 },
                 onError: reportTimerError,
             });
-            await dailyTimer.start();
             difficulty = await loadDifficulty(gameSlug, user);
             if (disposed) return;
-            await startNextRound();
+
+            readyToStart = true;
+            status.textContent = "";
+
+            if (localStorage.getItem(getStartStorageKey()) === "true") {
+                // Already pressed Start today: resume automatically.
+                void startGame();
+            } else {
+                // First visit today: wait for the player to press Start.
+                startScreen.hidden = false;
+            }
         } catch (error) {
             console.error(`Could not load ${gameTitle} progress:`, error);
             status.textContent = "Could not load progress. Retry to play.";
@@ -388,10 +449,12 @@ export function mountGame(root, { startRound, demo = null }) {
         disposed = true;
         dailyTimer?.stop();
         cleanupRound();
+        startButton.removeEventListener("click", startGame);
         retryButton.removeEventListener("click", retry);
         window.removeEventListener("pagehide", dispose);
     };
 
+    startButton.addEventListener("click", startGame);
     retryButton.addEventListener("click", retry);
     window.addEventListener("pagehide", dispose);
     void initialize();
