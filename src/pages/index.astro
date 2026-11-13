@@ -81,7 +81,7 @@ const games = await sanityClient.fetch(`
                     difficultyLabel.hidden = true;
                     requirement.textContent = guestLocked
                         ? "Create an account to unlock"
-                        : `Unlock after ${threshold} training days (${daysPlayed}/${threshold})`;
+                        : `Unlock after ${threshold} training days`;
                     requirement.hidden = false;
                     return;
                 }
