@@ -41,6 +41,10 @@ export function mountGame(root, { startRound, demo = null }) {
     const levelFeedback = root.querySelector("#game-level-feedback");
     const pointSymbols = root.querySelector("#game-point-symbols");
     const levelResult = root.querySelector("#game-level-result");
+    const twoPhaseFeedback = root.querySelector("#game-two-phase-feedback");
+    const phaseOne = root.querySelector("#game-phase-one");
+    const phaseTwo = root.querySelector("#game-phase-two");
+    const winsResult = root.querySelector("#game-wins-result");
 
     const { gameTitle = "this game", gameType = "", gameSlug = "" } = root.dataset;
     const unlockRequirement = Number(root.dataset.unlockRequirement ?? 0);
@@ -60,11 +64,25 @@ export function mountGame(root, { startRound, demo = null }) {
     let roundCleanup = null;
     let roundToken = 0;
     let disposed = false;
+    let completedPhases = 0;
 
     function resetLevelFeedback() {
+        // Percentage games
         pointSymbols.replaceChildren();
         levelResult.textContent = "";
         levelFeedback.hidden = gameType !== "percentage";
+
+        // Two-phase games
+        completedPhases = 0;
+
+        phaseOne.textContent = "−";
+        phaseTwo.textContent = "−";
+
+        phaseOne.classList.remove("good-phase", "bad-phase");
+        phaseTwo.classList.remove("good-phase", "bad-phase");
+
+        winsResult.textContent = "";
+        twoPhaseFeedback.hidden = gameType !== "two-phase";
     }
 
     function addPoint(good) {
@@ -76,6 +94,17 @@ export function mountGame(root, { startRound, demo = null }) {
         symbol.className = good ? "good-point" : "bad-point";
 
         pointSymbols.appendChild(symbol);
+    }
+
+    function completePhase(won) {
+        if (gameType !== "two-phase" || completedPhases >= 2) return;
+
+        const element = completedPhases === 0 ? phaseOne : phaseTwo;
+
+        element.textContent = won ? "✓" : "✗";
+        element.classList.add(won ? "good-phase" : "bad-phase");
+
+        completedPhases++;
     }
 
     function showLevelResult(result, previousDifficulty, nextDifficulty) {
@@ -96,6 +125,26 @@ export function mountGame(root, { startRound, demo = null }) {
                     : "Keep level";
 
         levelResult.textContent = `${Math.round(percentage)}% → ${outcome}`;
+    }
+
+    function showTwoPhaseResult(result, previousDifficulty, nextDifficulty) {
+        if (gameType !== "two-phase") return;
+
+        const wins = Number(result.wins);
+
+        if (!Number.isInteger(wins) || wins < 0 || wins > 2) {
+            console.error("Two-phase game returned invalid wins:", result);
+            return;
+        }
+
+        const outcome =
+            nextDifficulty > previousDifficulty
+                ? "Increase level"
+                : nextDifficulty < previousDifficulty
+                    ? "Decrease level"
+                    : "Keep level";
+
+        winsResult.textContent = `Wins: ${wins} → ${outcome}`;
     }
 
     function cleanupRound() {
@@ -171,6 +220,15 @@ export function mountGame(root, { startRound, demo = null }) {
             const cleanup = startRound({
                 board,
                 difficulty,
+                completePhase(won) {
+                    if (
+                        disposed ||
+                        token !== roundToken ||
+                        pendingResult !== null
+                    ) return;
+
+                    completePhase(won);
+                },
                 addPoint(good) {
                     if (
                         disposed ||
@@ -243,6 +301,12 @@ export function mountGame(root, { startRound, demo = null }) {
         if (!user) demo?.recordRound();
 
         showLevelResult(
+            pendingResult,
+            roundDifficulty,
+            difficulty
+        );
+        
+        showTwoPhaseResult(
             pendingResult,
             roundDifficulty,
             difficulty

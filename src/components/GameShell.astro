@@ -16,6 +16,15 @@ const { gameTitle, gameType, gameSlug, unlockRequirement = 0 } = Astro.props;
         <p id="game-level-result" aria-live="polite"></p>
     </div>
 
+    <div id="game-two-phase-feedback" hidden>
+        <p id="game-phase-results">
+            <span id="game-phase-one">−</span>
+            |
+            <span id="game-phase-two">−</span>
+        </p>
+        <p id="game-wins-result" aria-live="polite"></p>
+    </div>
+
     <div id="locked-game" hidden>
         <h2 id="locked-title">Unlock {gameTitle}</h2>
         <p id="locked-description"></p>
@@ -60,11 +69,11 @@ const { gameTitle, gameType, gameSlug, unlockRequirement = 0 } = Astro.props;
     }
 
     #game-point-symbols .good-point {
-        color: green;
+        color: var(--theme-color);
     }
 
     #game-point-symbols .bad-point {
-        color: crimson;
+        color: black;
     }
 
     #game-level-result {
@@ -94,5 +103,36 @@ const { gameTitle, gameType, gameSlug, unlockRequirement = 0 } = Astro.props;
     #locked-game a {
         color: var(--theme-color);
         font-weight: bold;
+    }
+
+    #game-two-phase-feedback {
+        text-align: center;
+        margin: 1rem 0;
+    }
+
+    #game-phase-results {
+        margin: 0;
+        font-weight: 600;
+        font-size: 1.25rem;
+    }
+
+    #game-phase-one.good-phase,
+    #game-phase-two.good-phase {
+        color: var(--theme-color);
+    }
+
+    #game-phase-one.bad-phase,
+    #game-phase-two.bad-phase {
+        color: black;
+    }
+
+    #game-wins-result {
+        margin: 0.5rem 0 0;
+        font-weight: bold;
+        color: var(--theme-color);
+    }
+
+    #game-wins-result:empty {
+        display: none;
     }
 </style>

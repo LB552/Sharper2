@@ -15,7 +15,7 @@ const {
     import { mountGame } from "../utils/gameController.js";
 
     mountGame(document.querySelector<HTMLElement>("#game-shell"), {
-        startRound({ board, difficulty, complete }) {
+        startRound({ board, difficulty, complete, completePhase }) {
             const LIGHT_COUNT = 6;
             const PHASES_PER_ROUND = 2;
             const INITIAL_DELAY = 250;
@@ -79,6 +79,7 @@ const {
                 inputLocked = true;
                 if (won) wins++;
                 else losses++;
+                completePhase(won);
                 currentPhase++;
                 if (currentPhase === PHASES_PER_ROUND) {
                     active = false;

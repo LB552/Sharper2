@@ -15,7 +15,7 @@ const {
     import { mountGame } from "../utils/gameController.js";
 
     mountGame(document.querySelector<HTMLElement>("#game-shell"), {
-        startRound({ board, difficulty, complete }) {
+        startRound({ board, difficulty, complete, completePhase }) {
             board.innerHTML = "";
 
             // GAME SETTINGS
@@ -332,6 +332,8 @@ const {
                     if (!active || won === null) return;
 
                     if (won) wins++;
+
+                    completePhase(won);
                 }
 
                 if (!active) return;
