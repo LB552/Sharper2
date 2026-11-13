@@ -89,15 +89,42 @@ export function mountGame(root, { startRound, demo = null }) {
         twoPhaseFeedback.hidden = gameType !== "two-phase";
     }
 
+    function createResultSymbol(correct) {
+        const namespace = "http://www.w3.org/2000/svg";
+
+        const svg = document.createElementNS(namespace, "svg");
+
+        svg.setAttribute("viewBox", "0 0 24 24");
+        svg.setAttribute("width", "20");
+        svg.setAttribute("height", "20");
+        svg.setAttribute("fill", "none");
+        svg.setAttribute("stroke", "currentColor");
+        svg.setAttribute("stroke-width", "2.5");
+        svg.setAttribute("stroke-linecap", "round");
+        svg.setAttribute("stroke-linejoin", "round");
+        svg.setAttribute("role", "img");
+        svg.setAttribute("aria-label", correct ? "Correct" : "Incorrect");
+
+        svg.classList.add(correct ? "good-point" : "bad-point");
+
+        const path = document.createElementNS(namespace, "path");
+
+        path.setAttribute(
+            "d",
+            correct
+                ? "M4 12 L10 18 L20 6"
+                : "M5 5 L19 19 M19 5 L5 19"
+        );
+
+        svg.appendChild(path);
+
+        return svg;
+    }
+
     function addPoint(good) {
         if (gameType !== "percentage") return;
 
-        const symbol = document.createElement("span");
-
-        symbol.textContent = good ? "✓" : "✗";
-        symbol.className = good ? "good-point" : "bad-point";
-
-        pointSymbols.appendChild(symbol);
+        pointSymbols.appendChild(createResultSymbol(good));
     }
 
     function completePhase(won) {
@@ -105,8 +132,7 @@ export function mountGame(root, { startRound, demo = null }) {
 
         const element = completedPhases === 0 ? phaseOne : phaseTwo;
 
-        element.textContent = won ? "✓" : "✗";
-        element.classList.add(won ? "good-phase" : "bad-phase");
+        element.replaceChildren(createResultSymbol(won));
 
         completedPhases++;
     }
@@ -164,7 +190,7 @@ export function mountGame(root, { startRound, demo = null }) {
         board.hidden = true;
         dailyMessage.hidden = false;
         retryButton.hidden = true;
-        status.textContent = "Today's five minutes are complete.";
+        status.textContent = "";
     }
 
     function showLocked(title, description, showSignup) {
@@ -259,7 +285,6 @@ export function mountGame(root, { startRound, demo = null }) {
         if (!pendingResult || saving || disposed) return;
         saving = true;
         retryButton.hidden = true;
-        status.textContent = "Saving progress...";
 
         try {
             const previousDifficulty = difficulty;
@@ -412,7 +437,7 @@ export function mountGame(root, { startRound, demo = null }) {
                 gameSlug,
                 user,
                 onTick: (remaining) => {
-                    timerLabel.textContent = `Daily time: ${formatRemaining(remaining)}`;
+                    timerLabel.textContent = `${formatRemaining(remaining)}`;
                 },
                 onNewDay: () => {
                     if (dailyLocked && (user || !demo?.hasReachedLimit())) {

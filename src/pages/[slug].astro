@@ -63,7 +63,7 @@ const GameComponent = {
 
     .game-intro {
         text-align: center;
-        margin-bottom: calc(var(--spacing-unit) * 2);
+        margin-bottom: calc(var(--spacing-unit) * 1.5);
     }
 
     .game-intro h1 {
@@ -85,6 +85,12 @@ const GameComponent = {
         box-sizing: border-box;
         padding: var(--spacing-unit);
         border-radius: var(--border-radius);
-        background: darkgrey;
+        background: var(--surface-color);
+    }
+
+    @media (max-width: 599px) {
+        .game-window {
+            padding: calc(var(--spacing-unit) * 0.75);
+        }
     }
 </style>

@@ -1,7 +1,9 @@
 @import url("https://fonts.googleapis.com/css2?family=Huninn&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols+2&display=swap");
 
 :root {
     --default-font: "Huninn", sans-serif;
+    --symbols-font: "Noto Sans Symbols 2", sans-serif;
 
     --theme-color: royalblue;
     --background-color: #fff;

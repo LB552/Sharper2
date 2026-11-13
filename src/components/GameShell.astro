@@ -26,7 +26,7 @@ const { gameTitle, gameType, gameSlug, unlockRequirement = 0 } = Astro.props;
     <div id="game-two-phase-feedback" hidden>
         <p id="game-phase-results">
             <span id="game-phase-one">−</span>
-            |
+            &nbsp;|&nbsp;
             <span id="game-phase-two">−</span>
         </p>
         <p id="game-wins-result" aria-live="polite"></p>
@@ -38,7 +38,7 @@ const { gameTitle, gameType, gameSlug, unlockRequirement = 0 } = Astro.props;
         <a id="locked-signup" href="/login">Create an account</a>
     </div>
 
-    <p id="daily-timer" role="timer" hidden>Daily time: --:--</p>
+    <p id="daily-timer" role="timer" hidden>--:--</p>
     <p id="game-status" role="status" aria-live="polite"></p>
 
     <div id="daily-limit-message" hidden>
@@ -54,128 +54,226 @@ const { gameTitle, gameType, gameSlug, unlockRequirement = 0 } = Astro.props;
 </div>
 
 <style>
+    /* GENERAL */
+
+    #game-shell {
+        position: relative;
+        color: var(--text-color);
+    }
+
     #game-shell [hidden] {
         display: none !important;
     }
 
-    #game-level-feedback {
-        text-align: center;
-        margin: 1rem 0;
-    }
+    /* SHARED FEEDBACK */
 
-    #game-points {
-        margin: 0;
-        font-weight: 600;
-    }
-
-    #game-point-symbols {
-        display: inline-flex;
-        flex-wrap: wrap;
-        gap: 0.25rem;
-        vertical-align: middle;
-    }
-
-    #game-point-symbols .good-point {
-        color: var(--theme-color);
-    }
-
-    #game-point-symbols .bad-point {
-        color: black;
-    }
-
-    #game-level-result {
-        margin: 0.5rem 0 0;
-        font-weight: bold;
-        color: var(--theme-color);
-    }
-
-    #game-level-result:empty {
-        display: none;
-    }
-
-    #daily-timer {
-        font-variant-numeric: tabular-nums;
-        font-weight: bold;
-    }
-
-    #daily-limit-message {
-        text-align: center;
-        padding: 1rem;
-    }
-
-    #locked-game {
-        text-align: center;
-    }
-
-    #locked-game a {
-        color: var(--theme-color);
-        font-weight: bold;
-    }
-
+    #game-level-feedback,
     #game-two-phase-feedback {
+        margin: var(--spacing-unit) 0;
         text-align: center;
-        margin: 1rem 0;
     }
 
+    #game-points,
     #game-phase-results {
         margin: 0;
         font-weight: 600;
+    }
+
+    #game-phase-results {
         font-size: 1.25rem;
     }
 
-    #game-phase-one.good-phase,
-    #game-phase-two.good-phase {
-        color: var(--theme-color);
-    }
-
-    #game-phase-one.bad-phase,
-    #game-phase-two.bad-phase {
-        color: black;
-    }
-
+    #game-level-result,
     #game-wins-result {
-        margin: 0.5rem 0 0;
-        font-weight: bold;
+        margin: calc(var(--spacing-unit) * 0.5) 0 0;
+        min-height: 1.5em;
         color: var(--theme-color);
+        font-weight: 600;
+        line-height: 1.5;
     }
 
+    #game-level-result:empty,
     #game-wins-result:empty {
-        display: none;
+        visibility: hidden;
     }
 
-    #game-start-screen {
+    /* DAILY TIMER */
+
+    #daily-timer {
+        position: absolute;
+        top: calc(var(--spacing-unit) * 0.5);
+        right: calc(var(--spacing-unit) * 0.5);
+        margin: 0;
+        color: var(--theme-color);
+        font-size: 1rem;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        z-index: 1;
+    }
+
+    /* SHARED MESSAGE SCREENS */
+
+    #game-start-screen,
+    #locked-game,
+    #daily-limit-message {
+        min-height: 250px;
+        box-sizing: border-box;
+        padding: calc(var(--spacing-unit) * 2) var(--spacing-unit);
+
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 1rem;
-        min-height: 250px;
-        padding: 2rem 1rem;
+        gap: var(--spacing-unit);
+
         text-align: center;
     }
 
     #game-start-screen h2,
-    #game-start-screen p {
+    #locked-game h2,
+    #daily-limit-message h2 {
         margin: 0;
+        color: var(--theme-color);
+        font-size: 1.5rem;
     }
 
-    #game-start-button {
-        padding: 0.75rem 2.5rem;
-        border: none;
-        border-radius: 10px;
-        background: var(--theme-color, royalblue);
-        color: white;
-        font: inherit;
+    #game-start-screen p,
+    #locked-game p,
+    #daily-limit-message p {
+        max-width: 550px;
+        margin: 0;
+        color: var(--muted-text-color);
+        font-size: 1rem;
+        line-height: 1.6;
+    }
+
+    /* SHARED BUTTONS AND LINKS */
+
+    #game-start-button,
+    #retry-button,
+    #locked-signup,
+    #daily-limit-message a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+
+        padding:
+            calc(var(--spacing-unit) * 0.75)
+            calc(var(--spacing-unit) * 2);
+
+        border: 2px solid var(--theme-color);
+        border-radius: var(--border-radius);
+
+        background: var(--theme-color);
+        color: var(--background-color);
+
+        font-family: var(--default-font);
+        font-size: 1rem;
         font-weight: 600;
+        line-height: 1.4;
+        text-decoration: none;
+
         cursor: pointer;
+        transition: filter 0.2s ease;
     }
 
-    #game-start-button:hover {
+    #game-start-button:hover,
+    #retry-button:hover,
+    #locked-signup:hover,
+    #daily-limit-message a:hover {
         filter: brightness(0.9);
     }
 
-    #game-start-button:focus-visible {
-        outline: 3px solid var(--theme-color, royalblue);
+    #game-start-button:focus-visible,
+    #retry-button:focus-visible,
+    #locked-signup:focus-visible,
+    #daily-limit-message a:focus-visible {
+        outline: 3px solid var(--theme-color);
         outline-offset: 3px;
+    }
+
+    #game-start-button:disabled,
+    #retry-button:disabled {
+        opacity: 0.6;
+        cursor: wait;
+    }
+
+    /* STATUS AND ERRORS */
+
+    #game-status {
+        margin: var(--spacing-unit) 0;
+        color: var(--text-color);
+        font-size: 1rem;
+        line-height: 1.5;
+    }
+
+    #game-status:empty {
+        display: none;
+    }
+
+    #retry-button {
+        margin-top: calc(var(--spacing-unit) * 0.5);
+    }
+
+
+    /* CHECKMARKS AND CROSSES */
+
+    #game-point-symbols {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: calc(var(--spacing-unit) * 0.25);
+        vertical-align: middle;
+    }
+
+    #game-point-symbols :global(svg),
+    #game-phase-one :global(svg),
+    #game-phase-two :global(svg) {
+        display: inline-block;
+        width: 1.25rem;
+        height: 1.25rem;
+        vertical-align: middle;
+    }
+
+    #game-point-symbols :global(.good-point),
+    #game-phase-one :global(.good-point),
+    #game-phase-two :global(.good-point) {
+        color: var(--theme-color);
+    }
+
+    #game-point-symbols :global(.bad-point),
+    #game-phase-one :global(.bad-point),
+    #game-phase-two :global(.bad-point) {
+        color: var(--text-color);
+    }
+
+    /* MOBILE */
+
+    @media (max-width: 599px) {
+        #game-start-screen,
+        #locked-game,
+        #daily-limit-message {
+            min-height: 220px;
+            padding:
+                calc(var(--spacing-unit) * 1.5)
+                calc(var(--spacing-unit) * 0.75);
+        }
+
+        #daily-timer {
+            top: 0;
+            right: 0;
+            font-size: 0.875rem;
+        }
+    }
+
+    /* ACCESSIBILITY */
+
+    @media (prefers-reduced-motion: reduce) {
+        #game-start-button,
+        #retry-button,
+        #locked-signup,
+        #daily-limit-message a {
+            transition: none;
+        }
     }
 </style>
