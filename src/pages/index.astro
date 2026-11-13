@@ -4,7 +4,8 @@ import Layout from "../layouts/Layout.astro";
 import StatsDashboard from "../components/StatsDashboard.astro";
 
 const games = await sanityClient.fetch(`
-    *[_type == "game" && defined(slug.current)] {
+    *[_type == "game" && defined(slug.current)]
+    | order(coalesce(unlockRequirement, 0) asc, title asc) {
         title,
         subheading,
         "slug": slug.current,

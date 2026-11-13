@@ -1,6 +1,12 @@
 ---
 import GameShell from "../components/GameShell.astro";
-const { gameTitle = "Memory", gameType, gameSlug, unlockRequirement = 0 } = Astro.props;
+
+const {
+    gameTitle,
+    gameType,
+    gameSlug,
+    unlockRequirement,
+} = Astro.props;
 ---
 
 <GameShell {gameTitle} {gameType} {gameSlug} {unlockRequirement}>
