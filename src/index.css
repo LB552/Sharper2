@@ -10,6 +10,8 @@
     --surface-color: #f5f6fa;
     --text-color: #222;
     --muted-text-color: #666;
+    --danger-color: #dc2626;
+    --danger-hover-color: #b91c1c;
 
     --border-radius: 14px;
     --spacing-unit: 1rem;

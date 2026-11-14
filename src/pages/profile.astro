@@ -127,6 +127,84 @@ import "../styles/forms.css";
                 </form>
             </section>
         </div>
+
+        <!-- ACCOUNT DELETION -->
+        <section id="danger-zone" class="form-card" hidden>
+            <h2>Danger zone</h2>
+
+            <p>
+                Permanently delete your Sharper account and all
+                associated progress. This action cannot be undone.
+            </p>
+
+            <button
+                id="delete-account-button"
+                type="button"
+            >
+                Delete account
+            </button>
+        </section>
+
+        <!-- DELETE CONFIRMATION -->
+        <dialog
+            id="delete-account-dialog"
+            aria-labelledby="delete-dialog-title"
+        >
+            <div class="delete-dialog-content">
+                <h2 id="delete-dialog-title">Delete your account?</h2>
+
+                <p>
+                    This will permanently delete your account,
+                    saved game progress, and training history.
+                    This action cannot be undone.
+                </p>
+
+                <form id="delete-account-form">
+                    <label for="delete-password">
+                        Current password
+                    </label>
+                    <input
+                        id="delete-password"
+                        type="password"
+                        autocomplete="current-password"
+                        required
+                    >
+
+                    <label for="delete-confirmation">
+                        Type DELETE to confirm
+                    </label>
+                    <input
+                        id="delete-confirmation"
+                        type="text"
+                        autocomplete="off"
+                        required
+                    >
+
+                    <p
+                        id="delete-account-message"
+                        role="status"
+                        aria-live="polite"
+                    ></p>
+
+                    <div class="delete-dialog-actions">
+                        <button
+                            id="cancel-delete-button"
+                            type="button"
+                        >
+                            Cancel
+                        </button>
+
+                        <button
+                            id="confirm-delete-button"
+                            type="submit"
+                            disabled
+                        >
+                            Delete permanently
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </dialog>
     </main>
 </Layout>
 
@@ -138,8 +216,14 @@ import "../styles/forms.css";
         updatePassword,
         EmailAuthProvider,
         reauthenticateWithCredential,
+        deleteUser,
     } from "firebase/auth";
-    import { doc, getDoc, updateDoc } from "firebase/firestore";
+    import {
+        doc,
+        getDoc,
+        updateDoc,
+        writeBatch,
+    } from "firebase/firestore";
     import { FirebaseError } from "firebase/app";
 
     // ELEMENTS
@@ -249,6 +333,10 @@ import "../styles/forms.css";
             profileContent.hidden = true;
         }
 
+        if (dangerZone) {
+            dangerZone.hidden = true;
+        }
+
         if (!user) {
             window.location.href = "/login";
             return;
@@ -271,6 +359,10 @@ import "../styles/forms.css";
 
             if (profileContent) {
                 profileContent.hidden = false;
+            }
+
+            if (dangerZone) {
+                dangerZone.hidden = false;
             }
 
             if (profileMessage) {
@@ -447,9 +539,306 @@ import "../styles/forms.css";
             }
         }
     });
+
+    // DELETE ACCOUNT
+
+    const dangerZone = document.querySelector<HTMLElement>(
+        "#danger-zone"
+    );
+
+    const deleteAccountButton = document.querySelector<HTMLButtonElement>(
+        "#delete-account-button"
+    );
+
+    const deleteDialog = document.querySelector<HTMLDialogElement>(
+        "#delete-account-dialog"
+    );
+
+    const deleteForm = document.querySelector<HTMLFormElement>(
+        "#delete-account-form"
+    );
+
+    const deletePassword = document.querySelector<HTMLInputElement>(
+        "#delete-password"
+    );
+
+    const deleteConfirmation = document.querySelector<HTMLInputElement>(
+        "#delete-confirmation"
+    );
+
+    const deleteMessage = document.querySelector<HTMLParagraphElement>(
+        "#delete-account-message"
+    );
+
+    const confirmDeleteButton = document.querySelector<HTMLButtonElement>(
+        "#confirm-delete-button"
+    );
+
+    const cancelDeleteButton = document.querySelector<HTMLButtonElement>(
+        "#cancel-delete-button"
+    );
+
+    let deletingAccount = false;
+
+    // Enable confirmation only when DELETE is typed.
+
+    deleteConfirmation?.addEventListener("input", () => {
+        if (!confirmDeleteButton || !deleteConfirmation) return;
+
+        confirmDeleteButton.disabled =
+            deleteConfirmation.value !== "DELETE";
+    });
+
+    // Open confirmation dialog.
+
+    deleteAccountButton?.addEventListener("click", () => {
+        if (!deleteDialog || !deleteForm || !deleteMessage) return;
+
+        deleteForm.reset();
+        deleteMessage.textContent = "";
+
+        if (confirmDeleteButton) {
+            confirmDeleteButton.disabled = true;
+        }
+
+        deleteDialog.showModal();
+    });
+
+    // Cancel deletion.
+
+    cancelDeleteButton?.addEventListener("click", () => {
+        if (!deletingAccount) {
+            deleteDialog?.close();
+        }
+    });
+
+    deleteDialog?.addEventListener("cancel", (event) => {
+        if (deletingAccount) {
+            event.preventDefault();
+        }
+    });
+
+    // Perform account deletion.
+
+    deleteForm?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const user = auth.currentUser;
+
+        if (
+            !user ||
+            !user.email ||
+            !deletePassword ||
+            !deleteConfirmation ||
+            !deleteMessage ||
+            !confirmDeleteButton ||
+            !cancelDeleteButton
+        ) return;
+
+        if (deletingAccount) return;
+
+        if (deleteConfirmation.value !== "DELETE") {
+            deleteMessage.textContent =
+                "Type DELETE to confirm.";
+            return;
+        }
+
+        deletingAccount = true;
+        confirmDeleteButton.disabled = true;
+        cancelDeleteButton.disabled = true;
+
+        deleteMessage.textContent = "Deleting account...";
+
+        let firestoreDeleted = false;
+
+        try {
+            // Verify the user's current password.
+
+            const credential = EmailAuthProvider.credential(
+                user.email,
+                deletePassword.value
+            );
+
+            await reauthenticateWithCredential(user, credential);
+
+            // Delete all three Firestore documents together.
+
+            const batch = writeBatch(db);
+
+            batch.delete(doc(db, "users", user.uid));
+            batch.delete(doc(db, "gameSaves", user.uid));
+            batch.delete(doc(db, "gameTimeLimits", user.uid));
+
+            await batch.commit();
+
+            firestoreDeleted = true;
+
+            // Delete the Firebase Authentication account.
+
+            await deleteUser(user);
+
+            // Return to the index page.
+
+            window.location.replace("/");
+
+        } catch (error) {
+            if (firestoreDeleted) {
+                deleteMessage.textContent =
+                    "Your saved data was deleted, but the account " +
+                    "could not be removed. Please try again or " +
+                    "contact support.";
+            } else if (
+                error instanceof FirebaseError &&
+                (
+                    error.code === "auth/wrong-password" ||
+                    error.code === "auth/invalid-credential"
+                )
+            ) {
+                deleteMessage.textContent =
+                    "Current password is incorrect.";
+            } else {
+                deleteMessage.textContent =
+                    getErrorMessage(error);
+            }
+
+            console.error("Account deletion error:", error);
+
+        } finally {
+            deletingAccount = false;
+            cancelDeleteButton.disabled = false;
+
+            confirmDeleteButton.disabled =
+                deleteConfirmation.value !== "DELETE";
+        }
+    });
 </script>
 
 <style>
+    /* DANGER ZONE */
+
+    #danger-zone {
+        max-width: 1100px;
+        margin: calc(var(--spacing-unit) * 2) auto 0;
+    }
+
+    #danger-zone[hidden] {
+        display: none !important;
+    }
+
+    #danger-zone h2 {
+        color: var(--danger-color, #dc2626);
+    }
+
+    #danger-zone p {
+        color: var(--muted-text-color);
+        line-height: 1.5;
+    }
+
+    #delete-account-button,
+    #confirm-delete-button {
+        padding: 0.75rem 1.5rem;
+        border: 2px solid var(--danger-color, #dc2626);
+        border-radius: var(--border-radius);
+        background: var(--danger-color, #dc2626);
+        color: white;
+        font-family: var(--default-font);
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    #delete-account-button:hover,
+    #confirm-delete-button:hover:not(:disabled) {
+        background: #b91c1c;
+        border-color: #b91c1c;
+    }
+
+    /* CONFIRMATION DIALOG */
+
+    #delete-account-dialog {
+        width: min(90vw, 440px);
+        max-height: 90vh;
+        box-sizing: border-box;
+        padding: 0;
+        border: none;
+        border-radius: var(--border-radius);
+        background: var(--background-color);
+        color: var(--text-color);
+        font-family: var(--default-font);
+        box-shadow: 0 16px 48px rgb(0 0 0 / 0.15);
+    }
+
+    #delete-account-dialog::backdrop {
+        background: rgb(0 0 0 / 0.5);
+    }
+
+    .delete-dialog-content {
+        padding: calc(var(--spacing-unit) * 1.5);
+    }
+
+    .delete-dialog-content h2 {
+        margin: 0 0 var(--spacing-unit);
+        color: var(--danger-color, #dc2626);
+    }
+
+    .delete-dialog-content p {
+        line-height: 1.5;
+    }
+
+    #delete-account-form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    #delete-account-form label {
+        font-weight: 600;
+    }
+
+    #delete-account-form input {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid #ccc;
+        border-radius: var(--border-radius);
+        background: var(--background-color);
+        color: var(--text-color);
+        font: inherit;
+    }
+
+    .delete-dialog-actions {
+        display: flex;
+        gap: var(--spacing-unit);
+        margin-top: var(--spacing-unit);
+    }
+
+    .delete-dialog-actions button {
+        flex: 1;
+    }
+
+    #cancel-delete-button {
+        padding: 0.75rem 1rem;
+        border: 2px solid var(--theme-color);
+        border-radius: var(--border-radius);
+        background: transparent;
+        color: var(--theme-color);
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    #confirm-delete-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    #delete-account-button:focus-visible,
+    #confirm-delete-button:focus-visible,
+    #cancel-delete-button:focus-visible {
+        outline: 3px solid var(--theme-color);
+        outline-offset: 3px;
+    }
+
     @media (min-width: 1000px) {
         .form-page {
             max-width: 1100px;
