@@ -5,91 +5,101 @@ import "../styles/forms.css";
 
 <Layout>
     <main class="form-page">
-        <h1>Login / Register</h1>
+        <!-- GUEST VIEW -->
+        <div id="guest-view" hidden>
+            <h1>Login / Register</h1>
 
-        <div class="form-grid">
-            <!-- LOGIN -->
-            <section class="form-card">
-                <h2>Log in</h2>
+            <div class="form-grid">
+                <!-- LOGIN -->
+                <section class="form-card">
+                    <h2>Log in</h2>
 
-                <form id="login-form">
-                    <input
-                        type="email"
-                        id="login-email"
-                        placeholder="Email"
-                        aria-label="Email"
-                        autocomplete="email"
-                        required
-                    >
+                    <form id="login-form">
+                        <input
+                            type="email"
+                            id="login-email"
+                            placeholder="Email"
+                            aria-label="Email"
+                            autocomplete="email"
+                            required
+                        >
 
-                    <input
-                        type="password"
-                        id="login-password"
-                        placeholder="Password"
-                        aria-label="Password"
-                        autocomplete="current-password"
-                        required
-                    >
+                        <input
+                            type="password"
+                            id="login-password"
+                            placeholder="Password"
+                            aria-label="Password"
+                            autocomplete="current-password"
+                            required
+                        >
 
-                    <button type="submit">Log in</button>
+                        <button type="submit">Log in</button>
 
-                    <p id="login-message" role="status" aria-live="polite"></p>
-                </form>
-            </section>
+                        <p id="login-message" role="status" aria-live="polite"></p>
+                    </form>
+                </section>
 
-            <!-- REGISTRATION -->
-            <section class="form-card">
-                <h2>Create account</h2>
+                <!-- REGISTRATION -->
+                <section class="form-card">
+                    <h2>Create account</h2>
 
-                <form id="register-form">
-                    <input
-                        type="email"
-                        id="register-email"
-                        placeholder="Email"
-                        aria-label="Email"
-                        autocomplete="email"
-                        required
-                    >
+                    <form id="register-form">
+                        <input
+                            type="email"
+                            id="register-email"
+                            placeholder="Email"
+                            aria-label="Email"
+                            autocomplete="email"
+                            required
+                        >
 
-                    <input
-                        type="password"
-                        id="register-password"
-                        placeholder="Password"
-                        aria-label="Password"
-                        autocomplete="new-password"
-                        minlength="6"
-                        required
-                    >
+                        <input
+                            type="password"
+                            id="register-password"
+                            placeholder="Password"
+                            aria-label="Password"
+                            autocomplete="new-password"
+                            minlength="6"
+                            required
+                        >
 
-                    <input
-                        type="password"
-                        id="confirm-password"
-                        placeholder="Repeat password"
-                        aria-label="Repeat password"
-                        autocomplete="new-password"
-                        minlength="6"
-                        required
-                    >
+                        <input
+                            type="password"
+                            id="confirm-password"
+                            placeholder="Repeat password"
+                            aria-label="Repeat password"
+                            autocomplete="new-password"
+                            minlength="6"
+                            required
+                        >
 
-                    <input
-                        type="text"
-                        id="register-username"
-                        placeholder="Username"
-                        aria-label="Username"
-                        autocomplete="username"
-                        minlength="3"
-                        maxlength="20"
-                        pattern="[A-Za-z0-9_]+"
-                        title="Use 3–20 letters, numbers, or underscores."
-                        required
-                    >
+                        <input
+                            type="text"
+                            id="register-username"
+                            placeholder="Username"
+                            aria-label="Username"
+                            autocomplete="username"
+                            minlength="3"
+                            maxlength="20"
+                            pattern="[A-Za-z0-9_]+"
+                            title="Use 3–20 letters, numbers, or underscores."
+                            required
+                        >
 
-                    <button type="submit">Create account</button>
+                        <button type="submit">Create account</button>
 
-                    <p id="register-message" role="status" aria-live="polite"></p>
-                </form>
-            </section>
+                        <p id="register-message" role="status" aria-live="polite"></p>
+                    </form>
+                </section>
+            </div>
         </div>
+
+        <!-- LOGGED-IN VIEW -->
+        <section id="logged-in-view" class="form-card" hidden>
+            <h1>You're already logged in!</h1>
+            <p>You're all set to continue training.</p>
+            <a href="/" class="back-to-games">Back to games</a>
+        </section>
     </main>
 </Layout>
 
@@ -100,6 +110,8 @@ import "../styles/forms.css";
     } from "../utils/authHandler.js";
 
     import { FirebaseError } from "firebase/app";
+    import { onAuthStateChanged } from "firebase/auth";
+    import { auth } from "../firebase.js";
 
     // ELEMENTS
 
@@ -114,6 +126,18 @@ import "../styles/forms.css";
     const confirmPassword = document.querySelector<HTMLInputElement>("#confirm-password");
     const registerUsername = document.querySelector<HTMLInputElement>("#register-username");
     const registerMessage = document.querySelector<HTMLParagraphElement>("#register-message");
+
+    // AUTHENTICATION VIEW
+
+    const guestView = document.querySelector<HTMLElement>("#guest-view");
+    const loggedInView = document.querySelector<HTMLElement>("#logged-in-view");
+
+    onAuthStateChanged(auth, (user) => {
+        if (!guestView || !loggedInView) return;
+
+        guestView.hidden = !!user;
+        loggedInView.hidden = !user;
+    });
 
     // LOGIN
 
@@ -193,3 +217,52 @@ import "../styles/forms.css";
         }
     });
 </script>
+
+<style>
+    #guest-view[hidden],
+    #logged-in-view[hidden] {
+        display: none !important;
+    }
+
+    #logged-in-view {
+        max-width: 450px;
+        margin: 0 auto;
+        padding: calc(var(--spacing-unit) * 2);
+        text-align: center;
+    }
+
+    #logged-in-view h1 {
+        margin: 0 0 var(--spacing-unit);
+        color: var(--theme-color);
+    }
+
+    #logged-in-view p {
+        margin: 0 0 calc(var(--spacing-unit) * 1.5);
+        color: var(--muted-text-color);
+        line-height: 1.5;
+    }
+
+    .back-to-games {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.75rem 1.5rem;
+        border: 2px solid var(--theme-color);
+        border-radius: var(--border-radius);
+        background: var(--theme-color);
+        color: var(--background-color);
+        font-family: var(--default-font);
+        font-weight: 600;
+        text-decoration: none;
+        transition: filter 0.2s ease;
+    }
+
+    .back-to-games:hover {
+        filter: brightness(0.9);
+    }
+
+    .back-to-games:focus-visible {
+        outline: 3px solid var(--theme-color);
+        outline-offset: 3px;
+    }
+</style>
