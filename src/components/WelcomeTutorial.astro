@@ -1,0 +1,411 @@
+<dialog id="welcome-tutorial" aria-labelledby="tutorial-title">
+    <div class="tutorial-content">
+        <button
+            id="tutorial-skip"
+            class="tutorial-skip"
+            type="button"
+        >
+            Skip
+        </button>
+
+        <div class="tutorial-icon" aria-hidden="true">
+            <svg
+                id="tutorial-illustration"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
+                <path id="tutorial-icon-path"></path>
+            </svg>
+        </div>
+
+        <h2 id="tutorial-title"></h2>
+        <p id="tutorial-description"></p>
+        <p id="tutorial-detail"></p>
+
+        <div
+            id="tutorial-dots"
+            class="tutorial-dots"
+            role="group"
+            aria-label="Tutorial pages"
+        ></div>
+
+        <div class="tutorial-actions">
+            <button id="tutorial-back" type="button">
+                Back
+            </button>
+            <button id="tutorial-next" type="button">
+                Next
+            </button>
+        </div>
+    </div>
+</dialog>
+
+<script>
+    import "../firebase.js";
+    import { getAuth, onAuthStateChanged } from "firebase/auth";
+    import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
+
+    const auth = getAuth();
+    const db = getFirestore();
+
+    const dialog = document.querySelector<HTMLDialogElement>(
+        "#welcome-tutorial"
+    )!;
+
+    const title = document.querySelector<HTMLElement>(
+        "#tutorial-title"
+    )!;
+
+    const description = document.querySelector<HTMLElement>(
+        "#tutorial-description"
+    )!;
+
+    const detail = document.querySelector<HTMLElement>(
+        "#tutorial-detail"
+    )!;
+
+    const iconPath = document.querySelector<SVGPathElement>(
+        "#tutorial-icon-path"
+    )!;
+
+    const dots = document.querySelector<HTMLElement>(
+        "#tutorial-dots"
+    )!;
+
+    const backButton = document.querySelector<HTMLButtonElement>(
+        "#tutorial-back"
+    )!;
+
+    const nextButton = document.querySelector<HTMLButtonElement>(
+        "#tutorial-next"
+    )!;
+
+    const skipButton = document.querySelector<HTMLButtonElement>(
+        "#tutorial-skip"
+    )!;
+
+    const pages = [
+        {
+            title: "Welcome to Sharper",
+            description:
+                "Train your working memory with short, focused minigames.",
+            detail:
+                "Play a little each day and build a consistent routine.",
+            icon:
+                "M9 18h6 M10 22h4 M9 14c-2-1-3-3-3-5a6 6 0 0 1 12 0c0 2-1 4-3 5l-1 2h-4z"
+        },
+        {
+            title: "Five minutes per game",
+            description:
+                "Each game gives you five minutes of playtime per day.",
+            detail:
+                "When your time runs out, finish your current session and come back tomorrow.",
+            icon:
+                "M12 6v6l4 2 M12 22a10 10 0 1 0 0-20a10 10 0 0 0 0 20z"
+        },
+        {
+            title: "Find your level",
+            description:
+                "The games adapt to your performance.",
+            detail:
+                "Your difficulty increases, stays the same, or decreases based on your results.",
+            icon:
+                "M4 19h16 M6 15l5-5 4 3 4-7 M15 6h4v4"
+        },
+        {
+            title: "Unlock more games",
+            description:
+                "Keep playing to unlock additional challenges.",
+            detail:
+                "New games become available as you complete more days of training.",
+            icon:
+                "M5 11h14v11H5z M8 11V7a4 4 0 0 1 8 0v4 M12 15v3"
+        }
+    ];
+
+    const guestStorageKey = "sharperWelcomeTutorialSeen";
+
+    let currentPage = 0;
+    let currentUser = auth.currentUser;
+    let authReady = false;
+
+    function renderPage() {
+        const page = pages[currentPage];
+
+        title.textContent = page.title;
+        description.textContent = page.description;
+        detail.textContent = page.detail;
+        iconPath.setAttribute("d", page.icon);
+
+        backButton.disabled = currentPage === 0;
+        nextButton.textContent =
+            currentPage === pages.length - 1
+                ? "Get started"
+                : "Next";
+
+        dots.replaceChildren();
+
+        pages.forEach((_, index) => {
+            const dot = document.createElement("button");
+
+            dot.type = "button";
+            dot.className = "tutorial-dot";
+            dot.setAttribute("aria-label", `Page ${index + 1}`);
+
+            if (index === currentPage) {
+                dot.classList.add("active");
+                dot.setAttribute("aria-current", "step");
+            }
+
+            dot.addEventListener("click", () => {
+                currentPage = index;
+                renderPage();
+            });
+
+            dots.appendChild(dot);
+        });
+    }
+
+    function openTutorial() {
+        if (dialog.open) return;
+
+        currentPage = 0;
+        renderPage();
+        dialog.showModal();
+    }
+
+    async function markTutorialSeen() {
+        if (!currentUser) {
+            localStorage.setItem(guestStorageKey, "true");
+            return;
+        }
+
+        try {
+            await updateDoc(doc(db, "users", currentUser.uid), {
+                welcomeTutorialSeen: true
+            });
+        } catch (error) {
+            console.error("Could not save tutorial status:", error);
+        }
+    }
+
+    function closeTutorial() {
+        if (!dialog.open) return;
+
+        dialog.close();
+        void markTutorialSeen();
+    }
+
+    function isIndexPage() {
+        return window.location.pathname === "/";
+    }
+
+    async function checkFirstVisit() {
+        if (!isIndexPage()) return;
+
+        if (!currentUser) {
+            if (localStorage.getItem(guestStorageKey) !== "true") {
+                openTutorial();
+            }
+
+            return;
+        }
+
+        try {
+            const userDocument = await getDoc(
+                doc(db, "users", currentUser.uid)
+            );
+
+            if (!userDocument.exists()) return;
+
+            if (userDocument.data().welcomeTutorialSeen !== true) {
+                openTutorial();
+            }
+        } catch (error) {
+            console.error("Could not load tutorial status:", error);
+        }
+    }
+
+    backButton.addEventListener("click", () => {
+        if (currentPage === 0) return;
+
+        currentPage--;
+        renderPage();
+    });
+
+    nextButton.addEventListener("click", () => {
+        if (currentPage === pages.length - 1) {
+            closeTutorial();
+            return;
+        }
+
+        currentPage++;
+        renderPage();
+    });
+
+    skipButton.addEventListener("click", closeTutorial);
+
+    dialog.addEventListener("cancel", (event) => {
+        event.preventDefault();
+        closeTutorial();
+    });
+
+    window.addEventListener("open-sharper-tutorial", openTutorial);
+
+    onAuthStateChanged(auth, (user) => {
+        const previousUid = currentUser?.uid ?? null;
+        const nextUid = user?.uid ?? null;
+
+        currentUser = user;
+
+        if (!authReady || previousUid !== nextUid) {
+            authReady = true;
+            void checkFirstVisit();
+        }
+    });
+</script>
+
+<style>
+    #welcome-tutorial {
+        width: min(90vw, 440px);
+        height: 440px;
+        max-height: 90vh;
+        box-sizing: border-box;
+        padding: 0;
+        border: none;
+        border-radius: var(--border-radius);
+        background: var(--background-color);
+        color: var(--text-color);
+        font-family: var(--default-font);
+        box-shadow: 0 16px 48px rgb(0 0 0 / 0.15);
+    }
+
+    #welcome-tutorial::backdrop {
+        background: rgb(0 0 0 / 0.5);
+    }
+
+    .tutorial-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--spacing-unit);
+        min-height: 100%;
+        box-sizing: border-box;
+        padding: calc(var(--spacing-unit) * 1.5);
+        text-align: center;
+    }
+
+    .tutorial-skip {
+        align-self: flex-end;
+        border: none;
+        background: transparent;
+        color: var(--muted-text-color);
+        font: inherit;
+        cursor: pointer;
+    }
+
+    .tutorial-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 76px;
+        height: 76px;
+        border-radius: 50%;
+        background: var(--surface-color);
+        color: var(--theme-color);
+    }
+
+    .tutorial-icon svg {
+        width: 42px;
+        height: 42px;
+    }
+
+    #tutorial-title {
+        margin: 0;
+        color: var(--theme-color);
+        font-size: 1.5rem;
+    }
+
+    #tutorial-description,
+    #tutorial-detail {
+        margin: 0;
+        line-height: 1.5;
+    }
+
+    #tutorial-detail {
+        min-height: 3em;
+        color: var(--muted-text-color);
+        font-size: 0.9rem;
+    }
+
+    .tutorial-dots {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        margin: 0.5rem 0;
+    }
+
+    .tutorial-dots :global(.tutorial-dot) {
+        width: 12px;
+        height: 12px;
+        padding: 0;
+        border: 2px solid var(--theme-color);
+        border-radius: 50%;
+        background: transparent;
+        cursor: pointer;
+    }
+
+    .tutorial-dots :global(.tutorial-dot.active) {
+        background: var(--theme-color);
+    }
+
+    .tutorial-actions {
+        display: flex;
+        gap: var(--spacing-unit);
+        width: 100%;
+        margin-top: auto;
+    }
+
+    .tutorial-actions button {
+        flex: 1;
+        padding: 0.75rem 1rem;
+        border: 2px solid var(--theme-color);
+        border-radius: var(--border-radius);
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    #tutorial-back {
+        background: transparent;
+        color: var(--theme-color);
+    }
+
+    #tutorial-next {
+        background: var(--theme-color);
+        color: var(--background-color);
+    }
+
+    #tutorial-back:disabled {
+        opacity: 0.4;
+        cursor: default;
+    }
+
+    .tutorial-skip:focus-visible,
+    .tutorial-actions button:focus-visible,
+    .tutorial-dots :global(.tutorial-dot:focus-visible) {
+        outline: 3px solid var(--theme-color);
+        outline-offset: 3px;
+    }
+
+    @media (max-width: 599px) {
+        .tutorial-content {
+            padding: var(--spacing-unit);
+        }
+    }
+</style>

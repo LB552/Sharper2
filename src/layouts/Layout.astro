@@ -1,6 +1,8 @@
 ---
 import "../index.css";
 import Header from "../components/Header.astro";
+import StatsDashboard from "../components/StatsDashboard.astro";
+import WelcomeTutorial from "../components/WelcomeTutorial.astro";
 
 const { title = "Sharper" } = Astro.props;
 ---
@@ -14,6 +16,10 @@ const { title = "Sharper" } = Astro.props;
 
     <body>
         <Header />
+
+        <StatsDashboard />
+
+        <WelcomeTutorial />
 
         <main>
             <slot />

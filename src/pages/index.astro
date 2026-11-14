@@ -1,7 +1,6 @@
 ---
 import { sanityClient } from "sanity:client";
 import Layout from "../layouts/Layout.astro";
-import StatsDashboard from "../components/StatsDashboard.astro";
 
 const games = await sanityClient.fetch(`
     *[_type == "game" && defined(slug.current)]
@@ -16,8 +15,6 @@ const games = await sanityClient.fetch(`
 ---
 
 <Layout title="Sharper">
-    <StatsDashboard />
-
 	<h1>Games</h1>
 
     <div class="game-grid" id="game-grid" aria-busy="true">

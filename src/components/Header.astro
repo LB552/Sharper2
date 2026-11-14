@@ -33,6 +33,15 @@
     </a>
 
     <nav class="header-nav" aria-label="Account">
+        <button
+            id="tutorial-help-button"
+            type="button"
+            aria-label="How Sharper works"
+            title="How Sharper works"
+        >
+            Help
+        </button>
+
         <a
             href="/login"
             id="login-button"
@@ -84,6 +93,12 @@
     userInfo?.addEventListener("click", () => {
         document.dispatchEvent(new Event("sharper:open-stats"));
     });
+
+    document
+        .querySelector("#tutorial-help-button")
+        ?.addEventListener("click", () => {
+            window.dispatchEvent(new Event("open-sharper-tutorial"));
+        });
 
     // Update buttons and username based on authentication status.
     onAuthStateChanged(auth, async (user) => {
@@ -289,6 +304,31 @@
 
     #logout-message[hidden] {
         display: none;
+    }
+
+    #tutorial-help-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 40px;
+        padding: 0.5rem 0.25rem;
+
+        border: none;
+        border-radius: 4px;
+        background: transparent;
+        color: white;
+
+        font-family: var(--default-font);
+        font-size: 1rem;
+        font-weight: 600;
+
+        cursor: pointer;
+        transition: opacity 0.2s ease;
+    }
+
+    #tutorial-help-button:focus-visible {
+        outline: 2px solid white;
+        outline-offset: 3px;
     }
 
     @media (min-width: 600px) {
