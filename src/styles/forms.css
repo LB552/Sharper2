@@ -26,6 +26,14 @@
     background: var(--surface-color);
 }
 
+.form-card label {
+    display: block;
+    margin-bottom: 0;
+    color: var(--text-color);
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
 .form-card h2 {
     margin: 0 0 calc(var(--spacing-unit) * 1.5);
     color: var(--theme-color);
@@ -51,6 +59,7 @@
     font-family: var(--default-font);
     font-size: 1rem;
     transition: border-color 0.2s ease;
+    border: 2px solid #949494;
 }
 
 .form-card input::placeholder {
@@ -61,6 +70,23 @@
 .form-card input:focus {
     outline: none;
     border-color: var(--theme-color);
+}
+
+.form-card input[aria-invalid="true"] {
+    border-color: var(--danger-color, #dc2626);
+}
+
+.form-card input[aria-invalid="true"]:focus {
+    border-color: var(--danger-color, #dc2626);
+}
+
+.form-card input:focus-visible {
+    outline: 2px solid var(--theme-color);
+    outline-offset: 2px;
+}
+
+.form-card input[aria-invalid="true"]:focus-visible {
+    outline-color: var(--danger-color, #dc2626);
 }
 
 .form-card button {

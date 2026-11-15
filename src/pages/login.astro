@@ -3,8 +3,8 @@ import Layout from "../layouts/Layout.astro";
 import "../styles/forms.css";
 ---
 
-<Layout>
-    <main class="form-page">
+<Layout title="Log in or register | Sharper">
+    <div class="form-page">
         <!-- GUEST VIEW -->
         <div id="guest-view" hidden>
             <h1>Login / Register</h1>
@@ -14,21 +14,21 @@ import "../styles/forms.css";
                 <section class="form-card">
                     <h2>Log in</h2>
 
-                    <form id="login-form">
+                    <form id="login-form" aria-describedby="login-message">
+                        <label for="login-email">Email</label>
                         <input
                             type="email"
                             id="login-email"
                             placeholder="Email"
-                            aria-label="Email"
                             autocomplete="email"
                             required
                         >
 
+                        <label for="login-password">Password</label>
                         <input
                             type="password"
                             id="login-password"
                             placeholder="Password"
-                            aria-label="Password"
                             autocomplete="current-password"
                             required
                         >
@@ -43,46 +43,49 @@ import "../styles/forms.css";
                 <section class="form-card">
                     <h2>Create account</h2>
 
-                    <form id="register-form">
+                    <form id="register-form" aria-describedby="register-message">
+                        <label for="register-email">Email</label>
                         <input
                             type="email"
                             id="register-email"
                             placeholder="Email"
-                            aria-label="Email"
                             autocomplete="email"
                             required
                         >
 
+                        <label for="register-password">Password</label>
                         <input
                             type="password"
                             id="register-password"
                             placeholder="Password"
-                            aria-label="Password"
                             autocomplete="new-password"
                             minlength="6"
                             required
                         >
 
+                        <label for="confirm-password">Confirm password</label>
                         <input
                             type="password"
                             id="confirm-password"
                             placeholder="Repeat password"
-                            aria-label="Repeat password"
                             autocomplete="new-password"
                             minlength="6"
                             required
                         >
 
+                        <label for="register-username">Username</label>
+                        <p id="username-requirements">
+                            3–20 letters, numbers, or underscores.
+                        </p>
                         <input
                             type="text"
                             id="register-username"
                             placeholder="Username"
-                            aria-label="Username"
                             autocomplete="username"
+                            aria-describedby="username-requirements"
                             minlength="3"
                             maxlength="20"
                             pattern="[A-Za-z0-9_]+"
-                            title="Use 3–20 letters, numbers, or underscores."
                             required
                         >
 
@@ -100,7 +103,7 @@ import "../styles/forms.css";
             <p>You're all set to continue training.</p>
             <a href="/" class="back-to-games">Back to games</a>
         </section>
-    </main>
+    </div>
 </Layout>
 
 <script>

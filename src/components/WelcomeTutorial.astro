@@ -22,9 +22,16 @@
             </svg>
         </div>
 
-        <h2 id="tutorial-title"></h2>
-        <p id="tutorial-description"></p>
-        <p id="tutorial-detail"></p>
+        <div
+            id="tutorial-page-content"
+            role="group"
+            aria-live="polite"
+            aria-atomic="true"
+        >
+            <h2 id="tutorial-title"></h2>
+            <p id="tutorial-description"></p>
+            <p id="tutorial-detail"></p>
+        </div>
 
         <div
             id="tutorial-dots"
@@ -154,7 +161,10 @@
 
             dot.type = "button";
             dot.className = "tutorial-dot";
-            dot.setAttribute("aria-label", `Page ${index + 1}`);
+            dot.setAttribute(
+                "aria-label",
+                `Page ${index + 1} of ${pages.length}: ${pages[index].title}`
+            );
 
             if (index === currentPage) {
                 dot.classList.add("active");
@@ -299,6 +309,14 @@
         text-align: center;
     }
 
+    #tutorial-page-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--spacing-unit);
+        width: 100%;
+    }
+
     .tutorial-skip {
         align-self: flex-end;
         border: none;
@@ -351,16 +369,29 @@
     }
 
     .tutorial-dots :global(.tutorial-dot) {
-        width: 12px;
-        height: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
         padding: 0;
-        border: 2px solid var(--theme-color);
+        border: none;
         border-radius: 50%;
         background: transparent;
         cursor: pointer;
     }
 
-    .tutorial-dots :global(.tutorial-dot.active) {
+    .tutorial-dots :global(.tutorial-dot::before) {
+        content: "";
+        display: block;
+        width: 12px;
+        height: 12px;
+        box-sizing: border-box;
+        border: 2px solid var(--theme-color);
+        border-radius: 50%;
+    }
+
+    .tutorial-dots :global(.tutorial-dot.active::before) {
         background: var(--theme-color);
     }
 

@@ -19,15 +19,19 @@ const { gameTitle, gameType, gameSlug, unlockRequirement = 0 } = Astro.props;
     <div id="game-board" hidden></div>
 
     <div id="game-level-feedback" hidden>
-        <p id="game-points">Points: <span id="game-point-symbols"></span></p>
+        <span
+            id="game-point-symbols"
+            role="group"
+            aria-label="Session results"
+        ></span>
         <p id="game-level-result" aria-live="polite"></p>
     </div>
 
     <div id="game-two-phase-feedback" hidden>
         <p id="game-phase-results">
-            <span id="game-phase-one">−</span>
+            <span id="game-phase-one" aria-label="Phase one not completed">−</span>
             &nbsp;|&nbsp;
-            <span id="game-phase-two">−</span>
+            <span id="game-phase-two" aria-label="Phase two not completed">−</span>
         </p>
         <p id="game-wins-result" aria-live="polite"></p>
     </div>

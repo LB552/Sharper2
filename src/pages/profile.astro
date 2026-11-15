@@ -3,8 +3,8 @@ import Layout from "../layouts/Layout.astro";
 import "../styles/forms.css";
 ---
 
-<Layout>
-    <main class="form-page">
+<Layout title="Profile | Sharper">
+    <div class="form-page">
         <h1>Profile</h1>
 
         <p id="profile-message" role="status" aria-live="polite">
@@ -22,11 +22,11 @@ import "../styles/forms.css";
                 </p>
 
                 <form id="username-form">
+                    <label for="new-username">New username</label>
                     <input
                         type="text"
                         id="new-username"
                         placeholder="New username"
-                        aria-label="New username"
                         autocomplete="off"
                         minlength="3"
                         maxlength="20"
@@ -35,11 +35,12 @@ import "../styles/forms.css";
                         required
                     >
 
+                    <label for="confirm-username">Confirm new username</label>
                     <input
                         type="text"
                         id="confirm-username"
                         placeholder="Repeat new username"
-                        aria-label="Repeat new username"
+                        aria-describedby="username-message"
                         autocomplete="off"
                         minlength="3"
                         maxlength="20"
@@ -63,20 +64,21 @@ import "../styles/forms.css";
                 </p>
 
                 <form id="email-form">
+                    <label for="new-email">New email</label>
                     <input
                         type="email"
                         id="new-email"
                         placeholder="New email"
-                        aria-label="New email"
                         autocomplete="email"
                         required
                     >
 
+                    <label for="confirm-email">Confirm new email</label>
                     <input
                         type="email"
                         id="confirm-email"
                         placeholder="Repeat new email"
-                        aria-label="Repeat new email"
+                        aria-describedby="email-message"
                         autocomplete="off"
                         required
                     >
@@ -92,30 +94,31 @@ import "../styles/forms.css";
                 <h2>Change password</h2>
 
                 <form id="password-form">
+                    <label for="current-password">Current password</label>
                     <input
                         type="password"
                         id="current-password"
                         placeholder="Current password"
-                        aria-label="Current password"
                         autocomplete="current-password"
                         required
                     >
 
+                    <label for="new-password">New password</label>
                     <input
                         type="password"
                         id="new-password"
                         placeholder="New password"
-                        aria-label="New password"
                         autocomplete="new-password"
                         minlength="6"
                         required
                     >
 
+                    <label for="confirm-password">Confirm new password</label>
                     <input
                         type="password"
                         id="confirm-password"
                         placeholder="Repeat new password"
-                        aria-label="Repeat new password"
+                        aria-describedby="password-message"
                         autocomplete="new-password"
                         minlength="6"
                         required
@@ -149,11 +152,12 @@ import "../styles/forms.css";
         <dialog
             id="delete-account-dialog"
             aria-labelledby="delete-dialog-title"
+            aria-describedby="delete-dialog-description"
         >
             <div class="delete-dialog-content">
-                <h2 id="delete-dialog-title">Delete your account?</h2>
+                <h2 id="delete-dialog-title" tabindex="-1">Delete your account?</h2>
 
-                <p>
+                <p id="delete-dialog-description">
                     This will permanently delete your account,
                     saved game progress, and training history.
                     This action cannot be undone.
@@ -205,7 +209,7 @@ import "../styles/forms.css";
                 </form>
             </div>
         </dialog>
-    </main>
+    </div>
 </Layout>
 
 <script>
@@ -259,6 +263,9 @@ import "../styles/forms.css";
     const confirmUsername = document.querySelector<HTMLInputElement>(
         "#confirm-username"
     );
+    confirmUsername?.addEventListener("input", () => {
+        confirmUsername.removeAttribute("aria-invalid");
+    });
 
     const usernameMessage = document.querySelector<HTMLParagraphElement>(
         "#username-message"
@@ -275,6 +282,9 @@ import "../styles/forms.css";
     const confirmEmail = document.querySelector<HTMLInputElement>(
         "#confirm-email"
     );
+    confirmEmail?.addEventListener("input", () => {
+        confirmEmail.removeAttribute("aria-invalid");
+    });
 
     const emailMessage = document.querySelector<HTMLParagraphElement>(
         "#email-message"
@@ -291,6 +301,9 @@ import "../styles/forms.css";
     const confirmPassword = document.querySelector<HTMLInputElement>(
         "#confirm-password"
     );
+    confirmPassword?.addEventListener("input", () => {
+        confirmPassword.removeAttribute("aria-invalid");
+    });
 
     const passwordMessage = document.querySelector<HTMLParagraphElement>(
         "#password-message"
@@ -393,6 +406,10 @@ import "../styles/forms.css";
 
         if (username !== confirmUsername.value.trim()) {
             usernameMessage.textContent = "Usernames do not match.";
+
+            confirmUsername.setAttribute("aria-invalid", "true");
+            confirmUsername.focus();
+
             return;
         }
 
@@ -415,6 +432,7 @@ import "../styles/forms.css";
             }
 
             usernameForm.reset();
+            confirmUsername.removeAttribute("aria-invalid");
             usernameMessage.textContent = "Username updated successfully.";
         } catch (error) {
             usernameMessage.textContent = getErrorMessage(error);
@@ -439,6 +457,10 @@ import "../styles/forms.css";
 
         if (email !== confirmEmail.value.trim()) {
             emailMessage.textContent = "Email addresses do not match.";
+
+            confirmEmail.setAttribute("aria-invalid", "true");
+            confirmEmail.focus();
+
             return;
         }
 
@@ -479,6 +501,7 @@ import "../styles/forms.css";
             }
 
             emailForm.reset();
+            confirmEmail.removeAttribute("aria-invalid");
             emailMessage.textContent = "Email updated successfully.";
         } catch (error) {
             emailMessage.textContent = getErrorMessage(error);
@@ -503,6 +526,10 @@ import "../styles/forms.css";
 
         if (newPassword.value !== confirmPassword.value) {
             passwordMessage.textContent = "Passwords do not match.";
+
+            confirmPassword.setAttribute("aria-invalid", "true");
+            confirmPassword.focus();
+
             return;
         }
 
@@ -521,6 +548,7 @@ import "../styles/forms.css";
             await updatePassword(user, newPassword.value);
 
             passwordForm.reset();
+            confirmPassword.removeAttribute("aria-invalid");
 
             passwordMessage.textContent =
                 "Password updated successfully.";
@@ -602,6 +630,10 @@ import "../styles/forms.css";
         }
 
         deleteDialog.showModal();
+
+        document.querySelector<HTMLElement>(
+            "#delete-dialog-title"
+        )?.focus();
     });
 
     // Cancel deletion.

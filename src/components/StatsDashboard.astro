@@ -1,20 +1,9 @@
 <div class="stats-dashboard" id="stats-dashboard">
-    <!-- BACKDROP -->
-    <div
-        id="stats-backdrop"
-        class="stats-backdrop"
-        aria-hidden="true"
-    ></div>
-
     <!-- DASHBOARD PANEL -->
-    <aside
+    <dialog
         id="stats-panel"
         class="stats-panel"
-        role="dialog"
-        aria-modal="true"
         aria-labelledby="stats-title"
-        aria-hidden="true"
-        inert
     >
         <div class="stats-header">
             <h2 id="stats-title">Your Stats</h2>
@@ -83,7 +72,7 @@
                 Edit profile
             </a>
         </footer>
-    </aside>
+    </dialog>
 </div>
 
 <script>
@@ -125,20 +114,13 @@
         "#stats-close"
     );
 
-    const backdrop = document.querySelector<HTMLDivElement>(
-        "#stats-backdrop"
-    );
-
-    const panel = document.querySelector<HTMLElement>(
+    const panel = document.querySelector<HTMLDialogElement>(
         "#stats-panel"
     );
 
     const userInfo = document.querySelector<HTMLButtonElement>(
         "#user-info"
     );
-
-    let previousFocus: HTMLElement | null = null;
-    let previousBodyOverflow = "";
 
     // DAILY STREAK
 
@@ -373,48 +355,36 @@
     // OPEN
 
     function openDashboard() {
-        if (
-            !auth.currentUser ||
-            !dashboard ||
-            !panel ||
-            dashboard.classList.contains("is-open")
-        ) return;
+        if (!auth.currentUser || !dashboard || !panel || panel.open) {
+            return;
+        }
 
-        previousFocus = document.activeElement as HTMLElement;
-        previousBodyOverflow = document.body.style.overflow;
-
+        panel.showModal();
         dashboard.classList.add("is-open");
 
-        panel.inert = false;
-        panel.setAttribute("aria-hidden", "false");
         userInfo?.setAttribute("aria-expanded", "true");
-
-        document.body.style.overflow = "hidden";
-
         closeButton?.focus();
     }
 
     // CLOSE
 
     function closeDashboard() {
-        if (!dashboard || !panel) return;
+        if (!panel?.open) return;
 
-        const wasOpen = dashboard.classList.contains("is-open");
+        panel.close();
+    }
 
-        dashboard.classList.remove("is-open");
+    // CLEANUP AFTER CLOSING
 
-        if (wasOpen && panel.contains(document.activeElement)) {
-            previousFocus?.focus();
-        }
-
-        panel.inert = true;
-        panel.setAttribute("aria-hidden", "true");
+    panel?.addEventListener("close", () => {
+        dashboard?.classList.remove("is-open");
         userInfo?.setAttribute("aria-expanded", "false");
 
-        if (wasOpen) {
-            document.body.style.overflow = previousBodyOverflow;
+        // The user icon is the control that opens this dialog.
+        if (userInfo && !userInfo.hidden) {
+            userInfo.focus();
         }
-    }
+    });
 
     // HEADER EVENT
 
@@ -423,79 +393,12 @@
         openDashboard
     );
 
-    // CLOSE EVENTS
+    // CLOSE BUTTON
 
     closeButton?.addEventListener("click", closeDashboard);
-
-    backdrop?.addEventListener("click", closeDashboard);
-
-    // KEYBOARD SUPPORT
-
-    document.addEventListener("keydown", (event) => {
-        if (!dashboard?.classList.contains("is-open") || !panel) {
-            return;
-        }
-
-        if (event.key === "Escape") {
-            event.preventDefault();
-            closeDashboard();
-            return;
-        }
-
-        if (event.key !== "Tab") return;
-
-        const focusable = Array.from(
-            panel.querySelectorAll<HTMLElement>(
-                'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-            )
-        ).filter((element) => !element.hidden);
-
-        if (focusable.length === 0) {
-            event.preventDefault();
-            return;
-        }
-
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-
-        if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            last.focus();
-        } else if (
-            !event.shiftKey &&
-            document.activeElement === last
-        ) {
-            event.preventDefault();
-            first.focus();
-        }
-    });
 </script>
 
 <style>
-    /* BACKDROP */
-
-    .stats-backdrop {
-        position: fixed;
-        inset: 0;
-        z-index: 999;
-
-        background-color: rgba(0, 0, 0, 0.45);
-
-        opacity: 0;
-        visibility: hidden;
-        pointer-events: none;
-
-        transition:
-            opacity 0.25s ease,
-            visibility 0.25s ease;
-    }
-
-    .is-open .stats-backdrop {
-        opacity: 1;
-        visibility: visible;
-        pointer-events: auto;
-    }
-
     /* SIDEBAR */
 
     .stats-panel {
@@ -504,6 +407,11 @@
         bottom: 0;
         left: 0;
         z-index: 1000;
+
+        margin: 0;
+        padding: 0;
+        border: none;
+        max-height: 100dvh;
 
         width: 340px;
         max-width: 100%;
@@ -532,6 +440,10 @@
         opacity: 1;
         visibility: visible;
         pointer-events: auto;
+    }
+
+    .stats-panel::backdrop {
+        background: rgba(0, 0, 0, 0.45);
     }
 
     /* HEADER */
@@ -639,14 +551,9 @@
     }
 
     .stat-description {
-        display: block;
-        margin-top: auto;
-
-        font-size: 11px;
+        font-size: 0.8125rem;
         line-height: 1.5;
-        color: #777;
-
-        overflow-wrap: anywhere;
+        color: #666;
     }
 
     /* STAT ICONS */
@@ -740,7 +647,6 @@
     /* REDUCED MOTION */
 
     @media (prefers-reduced-motion: reduce) {
-        .stats-backdrop,
         .stats-panel {
             transition: none;
         }

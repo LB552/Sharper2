@@ -10,19 +10,49 @@ const { title = "Sharper" } = Astro.props;
 <html lang="en">
     <head>
         <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{title}</title>
     </head>
 
     <body>
+        <a class="skip-link" href="#main-content">
+            Skip to main content
+        </a>
+
         <Header />
 
         <StatsDashboard />
 
         <WelcomeTutorial />
 
-        <main>
+        <main id="main-content">
             <slot />
         </main>
     </body>
 </html>
+
+<style>
+    .skip-link {
+        position: fixed;
+        top: 1rem;
+        left: 1rem;
+        z-index: 2000;
+
+        padding: 0.75rem 1rem;
+        border-radius: var(--border-radius);
+
+        background: var(--background-color);
+        color: var(--theme-color);
+
+        font-weight: 600;
+        text-decoration: none;
+
+        transform: translateY(-200%);
+    }
+
+    .skip-link:focus {
+        transform: translateY(0);
+        outline: 3px solid var(--theme-color);
+        outline-offset: 3px;
+    }
+</style>

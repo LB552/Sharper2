@@ -134,6 +134,11 @@ export function mountGame(root, { startRound, demo = null }) {
 
         element.replaceChildren(createResultSymbol(won));
 
+        element.setAttribute(
+            "aria-label",
+            `Phase ${completedPhases + 1}: ${won ? "Won" : "Lost"}`
+        );
+
         completedPhases++;
     }
 
