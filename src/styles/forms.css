@@ -52,14 +52,13 @@
     min-width: 0;
     box-sizing: border-box;
     padding: calc(var(--spacing-unit) * 0.75);
-    border: 2px solid transparent;
+    border: 2px solid #949494;
     border-radius: calc(var(--border-radius) * 0.6);
     background: var(--background-color);
     color: var(--text-color);
     font-family: var(--default-font);
     font-size: 1rem;
     transition: border-color 0.2s ease;
-    border: 2px solid #949494;
 }
 
 .form-card input::placeholder {
