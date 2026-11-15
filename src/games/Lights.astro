@@ -15,14 +15,19 @@ const {
     import { mountGame } from "../utils/gameController.js";
 
     mountGame(document.querySelector<HTMLElement>("#game-shell"), {
-        startRound({ board, difficulty, complete, completePhase }) {
+        startRound({ board, difficulty, complete, completePhase, announce }) {
             const LIGHT_COUNT = 6;
             const PHASES_PER_ROUND = 2;
-            const INITIAL_DELAY = 250;
-            const FLASH_DURATION = 500;
-            const FLASH_DELAY = 250;
+
+            const INITIAL_DELAY = 2000;
+            const FLASH_DURATION = 650;
+            const FLASH_DELAY = 350;
             const CLICK_DURATION = 200;
             const PHASE_DELAY = 1000;
+
+            const sequenceAnnouncement = document.querySelector(
+                "#game-sequence-announcement"
+            );
 
             let active = true;
             let inputLocked = true;
@@ -31,6 +36,7 @@ const {
             let wins = 0;
             let losses = 0;
             let currentPhase = 0;
+
             const timeouts = new Set<ReturnType<typeof setTimeout>>();
 
             function schedule(callback: () => void, ms: number) {
@@ -47,40 +53,74 @@ const {
 
             function generateSequence() {
                 sequence = [];
+
                 for (let i = 0; i < 5 + difficulty; i++) {
-                    sequence.push(Math.floor(Math.random() * LIGHT_COUNT));
+                    let nextLight;
+
+                    do {
+                        nextLight = Math.floor(Math.random() * LIGHT_COUNT);
+                    } while (
+                        sequence.length > 0 &&
+                        nextLight === sequence[sequence.length - 1]
+                    );
+
+                    sequence.push(nextLight);
                 }
             }
 
             async function flashSequence() {
                 inputLocked = true;
-                const lights = board.querySelectorAll<HTMLDivElement>(".light");
+
+                const lights = board.querySelectorAll<HTMLButtonElement>(".light");
+
                 await delay(INITIAL_DELAY);
                 if (!active) return;
+
                 for (const index of sequence) {
                     lights[index].classList.add("active");
+
+                    // Announce each flash, including repeated numbers.
+                    const numberElement = document.createElement("span");
+                    numberElement.textContent = String(index + 1);
+
+                    sequenceAnnouncement.appendChild(numberElement);
+
+                    // Remove the previous announcement.
+                    while (sequenceAnnouncement.children.length > 1) {
+                        sequenceAnnouncement.firstElementChild?.remove();
+                    }
+
                     await delay(FLASH_DURATION);
                     if (!active) return;
+
                     lights[index].classList.remove("active");
+
                     await delay(FLASH_DELAY);
                     if (!active) return;
                 }
+
                 inputLocked = false;
+                announce("Input ready");
             }
 
             function startPhase() {
                 if (!active) return;
+
                 playerSequence = [];
                 generateSequence();
+
                 void flashSequence();
             }
 
             function finishPhase(won: boolean) {
                 inputLocked = true;
+
                 if (won) wins++;
                 else losses++;
+
                 completePhase(won);
                 currentPhase++;
+
                 if (currentPhase === PHASES_PER_ROUND) {
                     active = false;
                     complete({ wins, losses });
@@ -89,28 +129,61 @@ const {
                 }
             }
 
-            function clickLight(index: number, light: HTMLDivElement) {
+            function clickLight(index: number, light: HTMLButtonElement) {
                 if (!active || inputLocked) return;
+
                 playerSequence.push(index);
+
                 light.classList.add("active");
                 schedule(() => light.classList.remove("active"), CLICK_DURATION);
+
                 const position = playerSequence.length - 1;
-                if (sequence[position] !== index) finishPhase(false);
-                else if (playerSequence.length === sequence.length) finishPhase(true);
+
+                if (sequence[position] !== index) {
+                    light.setAttribute("aria-label", "Incorrect");
+                    finishPhase(false);
+                } else {
+                    light.setAttribute("aria-label", "Correct");
+
+                    if (playerSequence.length === sequence.length) {
+                        finishPhase(true);
+                    }
+                }
             }
 
             board.innerHTML = "";
+
+            const lightGrid = document.createElement("div");
+            lightGrid.classList.add("lights-grid");
+            board.appendChild(lightGrid);
+
             for (let i = 0; i < LIGHT_COUNT; i++) {
-                const light = document.createElement("div");
+                const light = document.createElement("button");
+
+                light.type = "button";
                 light.classList.add("light");
+                light.setAttribute("aria-label", `Light ${i + 1}`);
+
+                light.addEventListener("blur", () => {
+                    light.setAttribute("aria-label", `Light ${i + 1}`);
+                });
+
                 light.addEventListener("click", () => clickLight(i, light));
-                board.appendChild(light);
+
+                lightGrid.appendChild(light);
             }
+
+            board.setAttribute("aria-label", "Reset");
+            board.focus({ preventScroll: true });
             startPhase();
 
             return () => {
                 active = false;
-                for (const id of timeouts) clearTimeout(id);
+
+                for (const id of timeouts) {
+                    clearTimeout(id);
+                }
+
                 timeouts.clear();
             };
         },
@@ -118,19 +191,38 @@ const {
 </script>
 
 <style>
-    :global(#game-board) {
-        display: flex;
-        justify-content: center;
+    :global(#game-board .lights-grid .light) {
+        font-family: var(--default-font);
+        padding: 0;
+    }
+
+    :global(#game-board .lights-grid .light:focus-visible) {
+        outline: 3px solid var(--theme-color);
+        outline-offset: 4px;
+    }
+
+    :global(#game-board .lights-grid) {
+        display: grid;
+        grid-template-columns: repeat(3, 50px);
         gap: 15px;
+
+        width: max-content;
+        margin: auto;
         padding: 10px;
     }
-    :global(#game-board .light) {
+
+    :global(#game-board .lights-grid .light) {
         width: 50px;
         height: 50px;
         border-radius: 50%;
-        background-color: white;
-        border: 2px solid royalblue;
+
+        background-color: var(--background-color);
+        border: 2px solid var(--theme-color);
+
         cursor: pointer;
     }
-    :global(#game-board .light.active) { background-color: royalblue; }
+
+    :global(#game-board .lights-grid .light.active) {
+        background-color: var(--theme-color);
+    }
 </style>

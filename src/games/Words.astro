@@ -43,12 +43,28 @@ const {
     ];
 
     mountGame(document.querySelector<HTMLElement>("#game-shell"), {
-        startRound({ board, difficulty, complete, addPoint }) {
+        startRound({ board, difficulty, complete, addPoint, announce }) {
             board.innerHTML = "";
+
+            const sequenceAnnouncement =
+                document.querySelector<HTMLElement>(
+                    "#game-sequence-announcement"
+                )!;
+            sequenceAnnouncement.setAttribute("aria-atomic", "true");
+            sequenceAnnouncement.setAttribute("aria-relevant", "additions text");
+
+            // Focus the board before memorization begins.
+            // The initial delay allows VoiceOver to finish
+            // announcing the focus change.
+            board.setAttribute("tabindex", "-1");
+            board.setAttribute("aria-label", "Reset");
+
+            sequenceAnnouncement.textContent = "";
 
             // Create the word display.
             const wordDisplay = document.createElement("p");
             wordDisplay.className = "word-display";
+            wordDisplay.tabIndex = -1;
             board.appendChild(wordDisplay);
 
             // Create the input field.
@@ -59,7 +75,10 @@ const {
             wordInput.autocomplete = "off";
             wordInput.spellcheck = false;
             wordInput.disabled = true;
-            wordInput.setAttribute("aria-label", "Enter remembered word");
+            wordInput.setAttribute(
+                "aria-label",
+                "Enter remembered word"
+            );
             board.appendChild(wordInput);
 
             // Create the Skip button.
@@ -76,22 +95,42 @@ const {
 
                 for (let i = shuffled.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
-                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+
+                    [shuffled[i], shuffled[j]] =
+                        [shuffled[j], shuffled[i]];
                 }
 
                 return shuffled.slice(0, count);
             }
 
             const roundWordCount = 15 + difficulty;
-            const roundWords = getRandomWords(wordPool, roundWordCount);
+            const roundWords = getRandomWords(
+                wordPool,
+                roundWordCount
+            );
 
-            const back = Math.min(6 + difficulty * 2, roundWords.length);
+            const back = Math.min(
+                6 + difficulty * 2,
+                roundWords.length
+            );
+
+            const INITIAL_DELAY = 2000;
+            const INPUT_READY_DELAY = 700;
 
             let active = true;
             let currentWordIndex = 0;
             let goodPoints = 0;
             let badPoints = 0;
+
             let timeout: ReturnType<typeof setTimeout> | null = null;
+            let readyTimeout: ReturnType<typeof setTimeout> | null = null;
+
+            // Announce a word without changing keyboard focus.
+            function announceWord(word: string) {
+                if (!active) return;
+
+                sequenceAnnouncement.textContent = word;
+            }
 
             // STAGE 1: MEMORIZATION
 
@@ -103,14 +142,18 @@ const {
                     return;
                 }
 
-                // Show the word for 1 second.
-                wordDisplay.textContent = roundWords[index];
+                const word = roundWords[index];
+
+                // Display and announce the word immediately.
+                wordDisplay.textContent = word;
+                announceWord(word);
 
                 timeout = setTimeout(() => {
                     if (!active) return;
 
                     // Hide the word for 0.5 seconds.
                     wordDisplay.textContent = "";
+                    sequenceAnnouncement.textContent = "";
 
                     timeout = setTimeout(() => {
                         showPreviewWord(index + 1);
@@ -123,11 +166,28 @@ const {
             function startRecall() {
                 if (!active) return;
 
-                wordDisplay.textContent = roundWords[back] ?? "";
+                // Make the displayed word keyboard-accessible.
+                wordDisplay.tabIndex = 0;
 
+                // Enable input and Skip.
                 wordInput.disabled = false;
                 skipButton.disabled = false;
-                wordInput.focus();
+
+                const word = roundWords[back] ?? "";
+
+                wordDisplay.textContent = word;
+
+                // Announce the new word first.
+                if (word) {
+                    announceWord(word);
+                }
+
+                // Then announce that interaction is ready.
+                readyTimeout = setTimeout(() => {
+                    if (!active) return;
+
+                    announce("Input ready");
+                }, INPUT_READY_DELAY);
             }
 
             // Advance after a correct answer or a skip.
@@ -141,11 +201,20 @@ const {
                     return;
                 }
 
-                // Display the next word, if one exists.
-                wordDisplay.textContent =
+                // Display and announce the next word.
+                const nextWord =
                     roundWords[currentWordIndex + back] ?? "";
 
-                wordInput.focus();
+                wordDisplay.textContent = nextWord;
+
+                if (nextWord) {
+                    announceWord(nextWord);
+                } else {
+                    sequenceAnnouncement.textContent = "";
+                }
+
+                // Do not move focus. The player can continue
+                // typing or navigate using Tab.
             }
 
             function checkInput() {
@@ -154,20 +223,21 @@ const {
                 const answer = wordInput.value.trim().toLowerCase();
                 const correctWord = roundWords[currentWordIndex];
 
+                // Incorrect answers do nothing.
                 if (answer !== correctWord) return;
 
-                // Correct answer: award a good point.
                 goodPoints++;
                 addPoint(true);
+
                 advanceWord();
             }
 
             function skipWord() {
                 if (!active || skipButton.disabled) return;
 
-                // Skipped word: award a bad point.
                 badPoints++;
                 addPoint(false);
+
                 advanceWord();
             }
 
@@ -176,7 +246,13 @@ const {
 
                 wordInput.disabled = true;
                 skipButton.disabled = true;
+                wordDisplay.tabIndex = -1;
                 wordDisplay.textContent = "";
+                sequenceAnnouncement.textContent = "";
+
+                if (readyTimeout !== null) {
+                    clearTimeout(readyTimeout);
+                }
 
                 const total = goodPoints + badPoints;
 
@@ -192,8 +268,13 @@ const {
             wordInput.addEventListener("input", checkInput);
             skipButton.addEventListener("click", skipWord);
 
-            // Begin memorization.
-            showPreviewWord(0);
+            // Begin memorization after VoiceOver has had
+            // time to announce the board focus.
+            board.focus({ preventScroll: true });
+
+            timeout = setTimeout(() => {
+                showPreviewWord(0);
+            }, INITIAL_DELAY);
 
             // Cleanup between rounds.
             return () => {
@@ -202,6 +283,12 @@ const {
                 if (timeout !== null) {
                     clearTimeout(timeout);
                 }
+
+                if (readyTimeout !== null) {
+                    clearTimeout(readyTimeout);
+                }
+
+                sequenceAnnouncement.textContent = "";
 
                 wordInput.removeEventListener("input", checkInput);
                 skipButton.removeEventListener("click", skipWord);

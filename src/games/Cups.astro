@@ -15,8 +15,18 @@ const {
     import { mountGame } from "../utils/gameController.js";
 
     mountGame(document.querySelector<HTMLElement>("#game-shell"), {
-        startRound({ board, difficulty, complete, completePhase }) {
+        startRound({ board, difficulty, complete, completePhase, announce }) {
             board.innerHTML = "";
+
+            const sequenceAnnouncement =
+                document.querySelector<HTMLElement>(
+                    "#game-sequence-announcement"
+                )!;
+
+            sequenceAnnouncement.setAttribute("aria-atomic", "true");
+            sequenceAnnouncement.setAttribute("aria-relevant", "additions text");
+
+            board.setAttribute("aria-label", "Reset");
 
             // GAME SETTINGS
             const ballAmount = 6;
@@ -47,6 +57,7 @@ const {
             let acceptingInput = false;
             let nextNumber = 1;
             let wins = 0;
+            let previousSwap: string | null = null;
 
             const pendingDelays = new Map<number, () => void>();
             const activeAnimations = new Set<Animation>();
@@ -142,14 +153,37 @@ const {
             async function swapBalls() {
                 if (!active) return;
 
-                // Choose two different positions.
-                const first = Math.floor(Math.random() * ballAmount);
+            let first: number;
+            let second: number;
+            let ballA: HTMLButtonElement;
+            let ballB: HTMLButtonElement;
+            let numberA: number;
+            let numberB: number;
+            let swapKey: string;
 
-                let second = Math.floor(Math.random() * (ballAmount - 1));
+            // Choose two different balls, excluding the previous pairing.
+            do {
+                first = Math.floor(Math.random() * ballAmount);
+
+                second = Math.floor(Math.random() * (ballAmount - 1));
                 if (second >= first) second++;
 
-                const ballA = occupants[first];
-                const ballB = occupants[second];
+                ballA = occupants[first];
+                ballB = occupants[second];
+
+                numberA = balls.indexOf(ballA) + 1;
+                numberB = balls.indexOf(ballB) + 1;
+
+                // Treat "2 and 5" and "5 and 2" as the same swap.
+                swapKey = [first, second]
+                    .sort((a, b) => a - b)
+                    .join("-");
+            } while (swapKey === previousSwap);
+
+            previousSwap = swapKey;
+
+            // Announce ball identities, not positions.
+            sequenceAnnouncement.textContent = `${numberA} and ${numberB}`;
 
                 const animationA = animateMovement(
                     ballA,
@@ -185,6 +219,10 @@ const {
                 // Update the position tracking.
                 occupants[first] = ballB;
                 occupants[second] = ballA;
+
+                // Clear the announcement between swaps so a
+                // repeated pairing can trigger a new announcement.
+                sequenceAnnouncement.textContent = "";
             }
 
             // RESET BEFORE EACH PHASE
@@ -193,6 +231,12 @@ const {
                 occupants = [...balls];
                 nextNumber = 1;
                 acceptingInput = false;
+                previousSwap = null;
+
+                // Restore the original keyboard order for the new phase.
+                balls.forEach((ball) => {
+                    board.appendChild(ball);
+                });
 
                 balls.forEach((ball, index) => {
                     setPosition(ball, positions[index]);
@@ -216,6 +260,7 @@ const {
                 if (number === nextNumber) {
                     ball.textContent = String(number);
                     ball.classList.add("revealed");
+                    ball.setAttribute("aria-label", "Correct");
                     ball.disabled = true;
 
                     nextNumber++;
@@ -241,10 +286,21 @@ const {
                 // INCORRECT BALL
                 acceptingInput = false;
 
-                // Reveal every ball.
+                // Announce the result through the selected button.
+                ball.setAttribute("aria-label", "Incorrect");
+
                 balls.forEach((item, i) => {
                     item.textContent = String(i + 1);
                     item.disabled = true;
+
+                    if (item !== ball) {
+                        const positionIndex = occupants.indexOf(item);
+
+                        item.setAttribute(
+                            "aria-label",
+                            `Cup ${positionIndex + 1}, ball ${i + 1}`
+                        );
+                    }
                 });
 
                 // Give the player one second to see the answer.
@@ -268,6 +324,7 @@ const {
 
             async function playPhase(): Promise<boolean | null> {
                 if (!active) return null;
+                board.focus({ preventScroll: true });
 
             // Return balls to their default positions.
             resetBalls();
@@ -290,9 +347,10 @@ const {
             await wait(previewDuration);
             if (!active) return null;
 
-                // Hide all numbers.
+                // Hide the numbers both visually and from VoiceOver.
                 balls.forEach((ball) => {
                     ball.textContent = "";
+                    ball.setAttribute("aria-label", "Hidden cup");
                 });
 
                 // Pause before the first swap.
@@ -313,9 +371,20 @@ const {
                 // Enable interactivity.
                 acceptingInput = true;
 
-                balls.forEach((ball) => {
+                // occupants is ordered by position, not ball identity.
+                occupants.forEach((ball, positionIndex) => {
+                    ball.setAttribute(
+                        "aria-label",
+                        `Cup ${positionIndex + 1}`
+                    );
+
+                    // Make Tab order match the final spatial order.
+                    board.appendChild(ball);
+
                     ball.disabled = false;
                 });
+
+                announce("Input ready");
 
                 // Wait until the player wins or makes a mistake.
                 return new Promise<boolean>((resolve) => {
@@ -349,6 +418,7 @@ const {
             // CLEANUP
 
             return () => {
+                sequenceAnnouncement.textContent = "";
                 active = false;
                 acceptingInput = false;
 

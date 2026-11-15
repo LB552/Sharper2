@@ -25,7 +25,9 @@ const {
     import { mountGame } from "../utils/gameController.js";
     import { hasReachedDemoLimit, recordDemoRound } from "../utils/demoMode.js";
 
-    const demoDialog = document.querySelector<HTMLDialogElement>("#demo-limit-dialog")!;
+    const demoDialog = document.querySelector<HTMLDialogElement>(
+        "#demo-limit-dialog"
+    )!;
 
     mountGame(document.querySelector<HTMLElement>("#game-shell"), {
         demo: {
@@ -35,10 +37,15 @@ const {
                 if (!demoDialog.open) demoDialog.showModal();
             },
         },
-        startRound({ board, difficulty, complete, addPoint }) {
+
+        startRound({ board, difficulty, complete, addPoint, announce }) {
             const cardAmount = 10 + difficulty * 2;
             const cards: number[] = [];
-            for (let i = 1; i <= cardAmount / 2; i++) cards.push(i, i);
+
+            for (let i = 1; i <= cardAmount / 2; i++) {
+                cards.push(i, i);
+            }
+
             for (let i = cards.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [cards[i], cards[j]] = [cards[j], cards[i]];
@@ -46,14 +53,44 @@ const {
 
             let active = true;
             let locked = false;
-            let firstCard: HTMLDivElement | null = null;
+
+            let firstCard: HTMLButtonElement | null = null;
             let firstIndex: number | null = null;
             let firstWasSeen = false;
+
             let matchedPairs = 0;
             let goodPoints = 0;
             let badPoints = 0;
+
             const seenCards = new Set<number>();
             const timeouts = new Set<ReturnType<typeof setTimeout>>();
+
+            function setCardLabel(
+                card: HTMLButtonElement,
+                index: number,
+                state: "hidden" | "revealed" | "matched",
+                number?: number
+            ) {
+                const position = `Card ${index + 1}`;
+
+                if (state === "hidden") {
+                    card.setAttribute(
+                        "aria-label",
+                        `${position}, face down`
+                    );
+                } else if (state === "revealed") {
+                    card.setAttribute(
+                        "aria-label",
+                        String(number)
+                    );
+                } else {
+                    card.setAttribute(
+                        "aria-label",
+                        `${position}, number ${number}, matched`
+                    );
+                    card.setAttribute("aria-disabled", "true");
+                }
+            }
 
             function resetTurn() {
                 firstCard = null;
@@ -62,15 +99,30 @@ const {
                 locked = false;
             }
 
-            function flipCard(card: HTMLDivElement, index: number, number: number) {
-                if (!active || locked || card === firstCard ||
-                    card.classList.contains("matched") || card.classList.contains("flipped")) return;
+            function flipCard(
+                card: HTMLButtonElement,
+                index: number,
+                number: number
+            ) {
+                if (
+                    !active ||
+                    locked ||
+                    card === firstCard ||
+                    card.classList.contains("matched") ||
+                    card.classList.contains("flipped")
+                ) {
+                    return;
+                }
 
                 const wasSeen = seenCards.has(index);
                 seenCards.add(index);
+
                 card.classList.add("flipped");
                 card.textContent = String(number);
 
+                setCardLabel(card, index, "revealed", number);
+
+                // First card: remember it and wait for the second card.
                 if (firstCard === null) {
                     firstCard = card;
                     firstIndex = index;
@@ -78,41 +130,74 @@ const {
                     return;
                 }
 
+                // Second card: evaluate the pair.
                 locked = true;
+
                 const previousCard = firstCard;
                 const previousIndex = firstIndex!;
+
                 if (cards[previousIndex] === cards[index]) {
                     goodPoints++;
                     addPoint(true);
+
                     previousCard.classList.add("matched");
                     card.classList.add("matched");
+
+                    setCardLabel(
+                        previousCard,
+                        previousIndex,
+                        "matched",
+                        number
+                    );
+                    setCardLabel(card, index, "matched", number);
+
                     matchedPairs++;
+
                     resetTurn();
 
                     if (matchedPairs === cards.length / 2) {
                         active = false;
                         locked = true;
+
                         const total = goodPoints + badPoints;
+
                         complete({
                             goodPoints,
                             badPoints,
-                            percentage: total === 0 ? 0 : (goodPoints / total) * 100,
+                            percentage: total === 0
+                                ? 0
+                                : (goodPoints / total) * 100,
                         });
                     }
                 } else {
-                    if (firstWasSeen || wasSeen) {
-                            badPoints++;
-                            addPoint(false);
-                        }
+                    const penalized = firstWasSeen || wasSeen;
+
+                    if (penalized) {
+                        badPoints++;
+                        addPoint(false);
+                    }
+
                     const id = setTimeout(() => {
                         timeouts.delete(id);
+
                         if (!active) return;
+
                         previousCard.classList.remove("flipped");
                         card.classList.remove("flipped");
+
                         previousCard.textContent = "";
                         card.textContent = "";
+
+                        setCardLabel(
+                            previousCard,
+                            previousIndex,
+                            "hidden"
+                        );
+                        setCardLabel(card, index, "hidden");
+
                         resetTurn();
                     }, 1000);
+
                     timeouts.add(id);
                 }
             }
@@ -124,16 +209,33 @@ const {
             board.appendChild(cardGrid);
 
             cards.forEach((number, index) => {
-                const card = document.createElement("div");
+                const card = document.createElement("button");
+
+                card.type = "button";
                 card.classList.add("card");
                 card.textContent = "";
-                card.addEventListener("click", () => flipCard(card, index, number));
+
+                setCardLabel(card, index, "hidden");
+
+                card.addEventListener("click", () => {
+                    flipCard(card, index, number);
+                });
+
                 cardGrid.appendChild(card);
             });
 
+            // Make the first card ready for keyboard navigation.
+            cardGrid.querySelector<HTMLButtonElement>(
+                ".card"
+            )?.focus();
+
             return () => {
                 active = false;
-                for (const id of timeouts) clearTimeout(id);
+
+                for (const id of timeouts) {
+                    clearTimeout(id);
+                }
+
                 timeouts.clear();
             };
         },
@@ -169,6 +271,15 @@ const {
         color: var(--text-color);
 
         cursor: pointer;
+    }
+
+    :global(#game-board .memory-grid .card) {
+        font-family: var(--default-font);
+    }
+
+    :global(#game-board .memory-grid .card:focus-visible) {
+        outline: 3px solid var(--theme-color);
+        outline-offset: 3px;
     }
 
     @media (min-width: 600px) {

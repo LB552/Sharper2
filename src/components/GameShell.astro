@@ -16,14 +16,17 @@ const { gameTitle, gameType, gameSlug, unlockRequirement = 0 } = Astro.props;
         <button id="game-start-button" type="button">Start</button>
     </div>
 
-    <div id="game-board" hidden></div>
+    <div id="game-board" tabindex="-1" aria-label="Game board" hidden></div>
 
     <div id="game-level-feedback" hidden>
         <span
             id="game-point-symbols"
             role="group"
             aria-label="Session results"
+            aria-describedby="game-results-summary"
+            tabindex="0"
         ></span>
+        <span id="game-results-summary" class="sr-only"></span>
         <p id="game-level-result" aria-live="polite"></p>
     </div>
 
@@ -44,6 +47,14 @@ const { gameTitle, gameType, gameSlug, unlockRequirement = 0 } = Astro.props;
 
     <p id="daily-timer" role="timer" hidden>--:--</p>
     <p id="game-status" role="status" aria-live="polite"></p>
+    <p id="game-announcement" role="status" aria-atomic="true"></p>
+    <p
+        id="game-sequence-announcement"
+        class="sr-only"
+        aria-live="assertive"
+        aria-relevant="additions"
+        aria-atomic="false"
+    ></p>
 
     <div id="daily-limit-message" hidden>
         <h2>Daily time complete</h2>
@@ -58,6 +69,18 @@ const { gameTitle, gameType, gameSlug, unlockRequirement = 0 } = Astro.props;
 </div>
 
 <style>
+    .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+        border: 0;
+    }
+
     /* GENERAL */
 
     #game-shell {
@@ -249,6 +272,24 @@ const { gameTitle, gameType, gameSlug, unlockRequirement = 0 } = Astro.props;
     #game-phase-one :global(.bad-point),
     #game-phase-two :global(.bad-point) {
         color: var(--text-color);
+    }
+
+    #game-point-symbols:focus-visible {
+        outline: 3px solid var(--theme-color);
+        outline-offset: 4px;
+        border-radius: 4px;
+    }
+
+    #game-announcement {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+        border: 0;
     }
 
     /* MOBILE */

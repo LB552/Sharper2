@@ -33,6 +33,7 @@ export function mountGame(root, { startRound, demo = null }) {
     const startScreen = root.querySelector("#game-start-screen");
     const startButton = root.querySelector("#game-start-button");
     const status = root.querySelector("#game-status");
+    const announcement = root.querySelector("#game-announcement");
     const retryButton = root.querySelector("#retry-button");
     const timerLabel = root.querySelector("#daily-timer");
     const dailyMessage = root.querySelector("#daily-limit-message");
@@ -42,6 +43,7 @@ export function mountGame(root, { startRound, demo = null }) {
     const lockedSignup = root.querySelector("#locked-signup");
     const levelFeedback = root.querySelector("#game-level-feedback");
     const pointSymbols = root.querySelector("#game-point-symbols");
+    const resultsSummary = root.querySelector("#game-results-summary");
     const levelResult = root.querySelector("#game-level-result");
     const twoPhaseFeedback = root.querySelector("#game-two-phase-feedback");
     const phaseOne = root.querySelector("#game-phase-one");
@@ -71,6 +73,8 @@ export function mountGame(root, { startRound, demo = null }) {
     let launching = false;
 
     function resetLevelFeedback() {
+        resultsSummary.textContent = "";
+
         // Percentage games
         pointSymbols.replaceChildren();
         levelResult.textContent = "";
@@ -125,6 +129,12 @@ export function mountGame(root, { startRound, demo = null }) {
         if (gameType !== "percentage") return;
 
         pointSymbols.appendChild(createResultSymbol(good));
+
+        const result = good ? "Checkmark" : "Cross";
+
+        resultsSummary.textContent = resultsSummary.textContent
+            ? `${resultsSummary.textContent}, ${result}`
+            : result;
     }
 
     function completePhase(won) {
@@ -255,6 +265,18 @@ export function mountGame(root, { startRound, demo = null }) {
             const cleanup = startRound({
                 board,
                 difficulty,
+
+                announce(message) {
+                    if (token !== roundToken || disposed) return;
+
+                    announcement.textContent = "";
+
+                    setTimeout(() => {
+                        if (token !== roundToken || disposed) return;
+                        announcement.textContent = message;
+                    }, 50);
+                },
+
                 completePhase(won) {
                     if (
                         disposed ||

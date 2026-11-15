@@ -34,13 +34,13 @@ const GameComponent = {
 ---
 
 <Layout title={game.title}>
-    <main class="game-page">
+    <div class="game-page">
         <header class="game-intro">
             <h1>{game.title}</h1>
             {game.description && <p>{game.description}</p>}
         </header>
 
-        <section class="game-window" aria-label={`${game.title} gameplay`}>
+        <section class="game-window">
             {GameComponent && (
                 <GameComponent
                     gameTitle={game.title}
@@ -50,7 +50,7 @@ const GameComponent = {
                 />
             )}
         </section>
-    </main>
+      </div>
 </Layout>
 
 <style>
