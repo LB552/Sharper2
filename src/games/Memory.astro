@@ -118,12 +118,17 @@ const {
             }
 
             board.innerHTML = "";
+
+            const cardGrid = document.createElement("div");
+            cardGrid.classList.add("memory-grid");
+            board.appendChild(cardGrid);
+
             cards.forEach((number, index) => {
                 const card = document.createElement("div");
                 card.classList.add("card");
                 card.textContent = "";
                 card.addEventListener("click", () => flipCard(card, index, number));
-                board.appendChild(card);
+                cardGrid.appendChild(card);
             });
 
             return () => {
@@ -136,25 +141,42 @@ const {
 </script>
 
 <style>
-    :global(#game-board) {
-        display: flex;
-        flex-wrap: wrap;
+    :global(#game-board .memory-grid) {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 10px;
+
+        width: 100%;
+        max-width: 460px;
+        margin: auto;
         padding: 10px;
     }
-    :global(#game-board .card) {
+
+    :global(#game-board .memory-grid .card) {
         display: flex;
         align-items: center;
         justify-content: center;
-        box-sizing: border-box;
+
+        width: 100%;
+        aspect-ratio: 1 / 1;
+
+        border: 2px solid var(--theme-color);
         border-radius: 8px;
-        width: 50px;
-        height: 50px;
-        flex: 0 0 50px;
-        background-color: white;
-        border: 2px solid royalblue;
+        background-color: var(--background-color);
+
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--text-color);
+
         cursor: pointer;
     }
+
+    @media (min-width: 600px) {
+        :global(#game-board .memory-grid) {
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+        }
+    }
+
     #demo-limit-dialog {
         width: min(90vw, 440px);
         padding: 2rem;
