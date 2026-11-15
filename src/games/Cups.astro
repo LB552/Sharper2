@@ -157,11 +157,9 @@ const {
             let second: number;
             let ballA: HTMLButtonElement;
             let ballB: HTMLButtonElement;
-            let numberA: number;
-            let numberB: number;
             let swapKey: string;
 
-            // Choose two different balls, excluding the previous pairing.
+            // Choose two different positions, excluding the previous pairing.
             do {
                 first = Math.floor(Math.random() * ballAmount);
 
@@ -171,10 +169,7 @@ const {
                 ballA = occupants[first];
                 ballB = occupants[second];
 
-                numberA = balls.indexOf(ballA) + 1;
-                numberB = balls.indexOf(ballB) + 1;
-
-                // Treat "2 and 5" and "5 and 2" as the same swap.
+                // Treat positions 2–5 and 5–2 as the same swap.
                 swapKey = [first, second]
                     .sort((a, b) => a - b)
                     .join("-");
@@ -182,8 +177,8 @@ const {
 
             previousSwap = swapKey;
 
-            // Announce ball identities, not positions.
-            sequenceAnnouncement.textContent = `${numberA} and ${numberB}`;
+            // Announce positions, not hidden ball identities.
+            sequenceAnnouncement.textContent = `${first + 1} and ${second + 1}`;
 
                 const animationA = animateMovement(
                     ballA,
